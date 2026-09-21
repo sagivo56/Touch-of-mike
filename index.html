@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#008000" />
+<title>Touch — Russian Bank Solitaire</title>
+<style>
+  /* =========================================================
+     TOUCH (Russian Bank) — Classic Win95/XP Solitaire styling
+     ========================================================= */
+  :root {
+    --felt-1: #1f8a3b;
+    --felt-2: #0a6b2a;
+    --felt-edge: #064d1e;
+    --card-w: 58px;
+    --card-h: 82px;
+    --stack-offset: 20px;
+    --win-face: #ece9d8;      /* XP window face */
+    --win-blue1: #245edb;     /* XP title gradient */
+    --win-blue2: #3f8cf3;
+    --btn-face: #ece9d8;
+    --hint: #ffe14d;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overscroll-behavior: none;
+    font-family: "MS Sans Serif", "Tahoma", "Segoe UI", sans-serif;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  body {
+    background:
+      radial-gradient(ellipse at 50% 30%, var(--felt-1), var(--felt-2) 70%, var(--felt-edge) 100%);
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    touch-action: manipulation;
+  }
+
+  #app {
+    width: 100%;
+    max-width: 480px;
+    min-height: 100%;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
+  }
+
+  /* ---------- Title bar (XP look) ---------- */
+  .titlebar {
+    background: linear-gradient(180deg, var(--win-blue2) 0%, var(--win-blue1) 8%, #1b4bc0 100%);
+    color: #fff;
+    font-weight: bold;
+    font-size: 13px;
+    padding: 3px 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid #06308f;
+    text-shadow: 1px 1px 0 rgba(0,0,0,.4);
+    flex: 0 0 auto;
+  }
+  .titlebar .ico {
+    width: 16px; height: 16px;
+    background: #ffd700;
+    border: 1px solid #7a5c00;
+    border-radius: 2px;
+    display: inline-flex; align-items:center; justify-content:center;
+    color:#7a0000; font-size:11px; font-weight:bold;
+  }
+  .titlebar .spacer { flex: 1; }
+  .titlebar button {
+    font-family: inherit;
+    font-size: 11px;
+    background: var(--btn-face);
+    color: #000;
+    border: 2px outset #fff;
+    border-radius: 0;
+    padding: 1px 8px;
+    cursor: pointer;
+  }
+  .titlebar button:active { border-style: inset; }
+
+  /* ---------- Status strip ---------- */
+  .status {
+    flex: 0 0 auto;
+    background: #d8d4c0;
+    color: #000;
+    border-bottom: 2px solid #808070;
+    padding: 4px 8px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 26px;
+  }
+  .status .turn-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 1px solid #333;
+    background: #999;
+    flex: 0 0 auto;
+  }
+  .status .turn-dot.p1 { background: #2f6df0; }
+  .status .turn-dot.p2 { background: #d63030; }
+  .status .msg { flex: 1; font-weight: bold; }
+
+  /* ---------- Player + center zones ---------- */
+  .zone {
+    padding: 6px 8px;
+    flex: 0 0 auto;
+  }
+  .zone-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    opacity: .9;
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-shadow: 1px 1px 0 rgba(0,0,0,.4);
+  }
+  .zone-label .badge {
+    background: rgba(0,0,0,.35);
+    border-radius: 8px;
+    padding: 0 7px;
+    font-size: 11px;
+  }
+  .zone-label .badge.win { background:#ffd700; color:#5a3d00; }
+
+  .player-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  .pile-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .pile-caption {
+    font-size: 10px;
+    opacity: .85;
+    text-shadow: 1px 1px 0 rgba(0,0,0,.4);
+  }
+
+  .center {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 8px 10px;
+    border-top: 2px solid rgba(0,0,0,.25);
+    border-bottom: 2px solid rgba(0,0,0,.25);
+    background:
+      linear-gradient(180deg, rgba(0,0,0,.06), rgba(0,0,0,0) 40px);
+  }
+  .center-section-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    opacity: .85;
+    margin: 2px 0 4px;
+    text-shadow: 1px 1px 0 rgba(0,0,0,.4);
+  }
+
+  .grid4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px 6px;
+    justify-items: center;
+  }
+  .tableau-grid {
+    margin-top: 8px;
+    align-items: start;
+  }
+
+  /* ---------- Slots ---------- */
+  .slot {
+    width: var(--card-w);
+    height: var(--card-h);
+    border: 1px dashed rgba(255,255,255,.55);
+    border-radius: 5px;
+    position: relative;
+    flex: 0 0 auto;
+    background: rgba(255,255,255,.06);
+  }
+  .slot.foundation::after {
+    content: attr(data-hint);
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: rgba(255,255,255,.35);
+    pointer-events: none;
+  }
+  .tableau-slot {
+    /* grows with stacked cards */
+    min-height: var(--card-h);
+    height: auto;
+  }
+
+  .slot.valid-target {
+    border: 2px solid var(--hint);
+    box-shadow: 0 0 8px 2px rgba(255,225,77,.7);
+    background: rgba(255,225,77,.15);
+  }
+  .slot.valid-target.foundation::after { color: rgba(255,225,77,.5); }
+
+  /* ---------- Cards ---------- */
+  .card {
+    width: var(--card-w);
+    height: var(--card-h);
+    border-radius: 5px;
+    background: #fff;
+    border: 1px solid #000;
+    box-shadow: 0 1px 2px rgba(0,0,0,.4);
+    position: relative;
+    font-family: "MS Sans Serif", "Tahoma", "Segoe UI", sans-serif;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .card.red { color: #d40000; }
+  .card.black { color: #000; }
+
+  .card .corner {
+    position: absolute;
+    left: 3px;
+    top: 1px;
+    line-height: 1;
+    font-weight: bold;
+    text-align: center;
+  }
+  .card .corner .r { font-size: 13px; display:block; }
+  .card .corner .s { font-size: 11px; display:block; margin-top: -1px; }
+  .card .corner.br {
+    left: auto; top: auto;
+    right: 3px; bottom: 1px;
+    transform: rotate(180deg);
+  }
+  .card .pip {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: bold;
+  }
+  .card .pip.face {
+    font-size: 20px;
+    letter-spacing: -1px;
+  }
+
+  /* face-down / backs */
+  .card.back {
+    background:
+      repeating-linear-gradient(45deg, #123a8f 0 4px, #1e56c9 4px 8px),
+      repeating-linear-gradient(-45deg, rgba(255,255,255,.15) 0 4px, transparent 4px 8px);
+    border: 2px solid #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,.4), inset 0 0 0 2px #123a8f;
+  }
+  .card.back.red-back {
+    background:
+      repeating-linear-gradient(45deg, #8f1212 0 4px, #c91e1e 4px 8px),
+      repeating-linear-gradient(-45deg, rgba(255,255,255,.15) 0 4px, transparent 4px 8px);
+    box-shadow: 0 1px 2px rgba(0,0,0,.4), inset 0 0 0 2px #8f1212;
+  }
+
+  .card.selected {
+    outline: 3px solid var(--hint);
+    outline-offset: 0;
+    box-shadow: 0 0 10px 3px rgba(255,225,77,.85);
+    z-index: 50;
+  }
+  .card.movable::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 2px rgba(47,109,240,.0);
+  }
+
+  /* pile-in-a-slot (reserve/stock/waste show single card + count) */
+  .pilecard { position: relative; }
+  .count {
+    position: absolute;
+    right: -6px;
+    top: -6px;
+    background: #000;
+    color: #fff;
+    font-size: 10px;
+    border-radius: 9px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #fff;
+    z-index: 5;
+  }
+  .empty-pile {
+    width: var(--card-w);
+    height: var(--card-h);
+    border: 1px dashed rgba(255,255,255,.5);
+    border-radius: 5px;
+    background: rgba(0,0,0,.12);
+  }
+
+  /* tableau stacked cards */
+  .tableau-stack .card {
+    position: absolute;
+    left: 0;
+  }
+
+  /* ---------- Controls ---------- */
+  .controls {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    justify-content: center;
+    background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.18));
+  }
+  .btn {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: bold;
+    background: var(--btn-face);
+    color: #000;
+    border: 2px outset #fff;
+    padding: 8px 14px;
+    border-radius: 0;
+    cursor: pointer;
+    min-width: 120px;
+  }
+  .btn:active { border-style: inset; }
+  .btn:disabled { color: #888; cursor: default; }
+  .btn.primary {
+    background: linear-gradient(180deg, #eef6ff, #cfe2ff);
+  }
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 16px;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    width: 100%;
+    max-width: 340px;
+    background: var(--win-face);
+    color: #000;
+    border: 2px outset #fff;
+    box-shadow: 3px 3px 0 rgba(0,0,0,.4);
+  }
+  .modal .m-title {
+    background: linear-gradient(180deg, var(--win-blue2), var(--win-blue1));
+    color: #fff;
+    font-weight: bold;
+    font-size: 13px;
+    padding: 4px 8px;
+    text-shadow: 1px 1px 0 rgba(0,0,0,.4);
+  }
+  .modal .m-body {
+    padding: 12px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .modal .m-body h3 { margin: 8px 0 4px; font-size: 13px; }
+  .modal .m-body ul { margin: 4px 0; padding-left: 18px; }
+  .modal .m-body li { margin: 2px 0; }
+  .modal .m-foot {
+    padding: 8px 12px 12px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .big-result { text-align:center; font-size: 18px; font-weight: bold; margin: 6px 0; }
+
+  /* toast */
+  .toast {
+    position: absolute;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,.82);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 150;
+    opacity: 0;
+    transition: opacity .2s;
+    pointer-events: none;
+    max-width: 90%;
+    text-align: center;
+  }
+  .toast.show { opacity: 1; }
+
+  /* small screens tighten */
+  @media (max-height: 720px) {
+    :root { --card-w: 50px; --card-h: 70px; --stack-offset: 17px; }
+  }
+  @media (max-height: 620px) {
+    :root { --card-w: 44px; --card-h: 62px; --stack-offset: 15px; }
+    .zone { padding: 4px 6px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="titlebar">
+    <span class="ico">T</span>
+    <span>Touch — Russian Bank Solitaire</span>
+    <span class="spacer"></span>
+    <button id="rulesBtn">Rules</button>
+    <button id="newBtn">New</button>
+  </div>
+
+  <div class="status">
+    <span class="turn-dot" id="turnDot"></span>
+    <span class="msg" id="statusMsg">Your move</span>
+  </div>
+
+  <!-- Player 2 (opponent / AI) -->
+  <div class="zone" id="p2zone">
+    <div class="zone-label">
+      <span id="p2name">Player 2 (Computer)</span>
+      <span class="badge" id="p2reserve">Reserve: 13</span>
+    </div>
+    <div class="player-row" id="p2row"></div>
+  </div>
+
+  <!-- Center shared area -->
+  <div class="center">
+    <div class="center-section-label">Foundations — build UP by suit (A → K)</div>
+    <div class="grid4" id="foundations"></div>
+
+    <div class="center-section-label" style="margin-top:10px">Tableau — build DOWN in alternating colours</div>
+    <div class="grid4 tableau-grid" id="tableau"></div>
+  </div>
+
+  <!-- Player 1 (you) -->
+  <div class="zone" id="p1zone">
+    <div class="zone-label">
+      <span id="p1name">Player 1 (You)</span>
+      <span class="badge" id="p1reserve">Reserve: 13</span>
+    </div>
+    <div class="player-row" id="p1row"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="undoBtn" title="Take back moves this turn">Undo</button>
+    <button class="btn primary" id="endBtn">End Turn (Draw)</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Rules / result modal -->
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <div class="m-title" id="modalTitle">How to Play — Touch</div>
+      <div class="m-body" id="modalBody"></div>
+      <div class="m-foot" id="modalFoot"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   TOUCH — Russian Bank, 2-player competitive solitaire
+   Two 52-card decks (104). First to empty their 13-card
+   Reserve pile wins.
+   ============================================================ */
+
+const SUITS = ["S", "H", "D", "C"];               // spades, hearts, diamonds, clubs
+const SUIT_CHAR = { S: "♠", H: "♥", D: "♦", C: "♣" };
+const RED = { H: true, D: true, S: false, C: false };
+const RANK_LABEL = { 1: "A", 11: "J", 12: "Q", 13: "K" };
+
+let uid = 0;
+function makeDeck(deckIndex) {
+  const cards = [];
+  for (const s of SUITS) {
+    for (let r = 1; r <= 13; r++) {
+      cards.push({ id: ++uid, suit: s, rank: r, color: RED[s] ? "red" : "black", deck: deckIndex });
+    }
+  }
+  return cards;
+}
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+function rankLabel(r) { return RANK_LABEL[r] || String(r); }
+
+/* ---------------- Game state ---------------- */
+let G = null;               // main game state
+let selected = null;        // {kind:'reserve'|'waste'|'tableau', col?}
+let history = [];           // undo snapshots within current human turn
+let aiBusy = false;
+
+function newGame() {
+  // Combine two decks, shuffle, split 52/52.
+  const all = shuffle([...makeDeck(0), ...makeDeck(1)]);
+  const p1cards = all.slice(0, 52);
+  const p2cards = all.slice(52, 104);
+
+  function mkPlayer(cards) {
+    return {
+      reserve: cards.slice(0, 13),   // top = last element
+      stock: cards.slice(13),        // draw from end
+      waste: [],
+    };
+  }
+
+  G = {
+    players: [mkPlayer(p1cards), mkPlayer(p2cards)], // 0 = You (bottom), 1 = Computer (top)
+    foundations: Array.from({ length: 8 }, () => []),
+    tableau: Array.from({ length: 8 }, () => []),
+    current: 0,
+    over: false,
+    winner: null,
+  };
+  selected = null;
+  history = [];
+  aiBusy = false;
+  render();
+  setStatus("Your move — tap a card, then tap where to place it.");
+}
+
+/* ---------------- Rule helpers ---------------- */
+
+// top card of a pile (or null)
+function topOf(pile) { return pile.length ? pile[pile.length - 1] : null; }
+
+// Can card be placed on foundation index fi?
+function canFoundation(card, fi) {
+  const f = G.foundations[fi];
+  if (!card) return false;
+  if (f.length === 0) return card.rank === 1;             // only Ace on empty
+  const t = f[f.length - 1];
+  return card.suit === t.suit && card.rank === t.rank + 1; // same suit, +1
+}
+
+// Can card be placed on tableau column ti, given the source kind + player?
+function canTableau(card, ti, sourceKind, player) {
+  if (!card) return false;
+  const col = G.tableau[ti];
+  if (col.length === 0) {
+    // Empty column: must prioritise filling from Reserve.
+    // Only allowed from a NON-reserve source when that player's reserve is empty.
+    if (sourceKind !== "reserve" && G.players[player].reserve.length > 0) return false;
+    return true; // any card may start an empty column
+  }
+  const t = col[col.length - 1];
+  return card.color !== t.color && card.rank === t.rank - 1; // alt colour, one lower
+}
+
+// Resolve the currently selected source into {card, remove()}
+function resolveSource(sel, player) {
+  if (!sel) return null;
+  const p = G.players[player];
+  if (sel.kind === "reserve") {
+    const c = topOf(p.reserve);
+    return c ? { card: c, kind: "reserve", remove: () => p.reserve.pop() } : null;
+  }
+  if (sel.kind === "waste") {
+    const c = topOf(p.waste);
+    return c ? { card: c, kind: "waste", remove: () => p.waste.pop() } : null;
+  }
+  if (sel.kind === "tableau") {
+    const col = G.tableau[sel.col];
+    const c = topOf(col);
+    return c ? { card: c, kind: "tableau", remove: () => col.pop() } : null;
+  }
+  return null;
+}
+
+// List every legal destination for a given source (for highlighting + validation)
+function validTargets(src, player) {
+  const targets = [];
+  if (!src) return targets;
+  for (let fi = 0; fi < 8; fi++) if (canFoundation(src.card, fi)) targets.push({ type: "foundation", i: fi });
+  for (let ti = 0; ti < 8; ti++) if (canTableau(src.card, ti, src.kind, player)) targets.push({ type: "tableau", i: ti });
+  return targets;
+}
+
+// Does the current player have ANY legal move available?
+function hasAnyMove(player) {
+  const sources = [{ kind: "reserve" }, { kind: "waste" }];
+  for (let c = 0; c < 8; c++) sources.push({ kind: "tableau", col: c });
+  for (const s of sources) {
+    const src = resolveSource(s, player);
+    if (src && validTargets(src, player).length > 0) return true;
+  }
+  return false;
+}
+
+/* ---------------- Executing moves ---------------- */
+
+function snapshot() {
+  return JSON.stringify({
+    players: G.players, foundations: G.foundations, tableau: G.tableau,
+    current: G.current,
+  });
+}
+function restore(snap) {
+  const s = JSON.parse(snap);
+  G.players = s.players;
+  G.foundations = s.foundations;
+  G.tableau = s.tableau;
+  G.current = s.current;
+}
+
+function doMove(sel, target, player, recordUndo) {
+  const src = resolveSource(sel, player);
+  if (!src) return false;
+  const ok = target.type === "foundation"
+    ? canFoundation(src.card, target.i)
+    : canTableau(src.card, target.i, src.kind, player);
+  if (!ok) return false;
+
+  if (recordUndo) history.push(snapshot());
+
+  const card = src.remove();
+  if (target.type === "foundation") G.foundations[target.i].push(card);
+  else G.tableau[target.i].push(card);
+
+  // Win check: reserve emptied
+  if (G.players[player].reserve.length === 0 && !G.over) {
+    G.over = true;
+    G.winner = player;
+  }
+  return true;
+}
+
+// Draw a card from stock to waste; ends the player's turn.
+// If stock empty, flip waste over to become the new stock (once around).
+function drawCard(player) {
+  const p = G.players[player];
+  if (p.stock.length === 0) {
+    if (p.waste.length === 0) return false; // nothing to draw
+    p.stock = p.waste.slice().reverse();
+    p.waste = [];
+  }
+  p.waste.push(p.stock.pop());
+  return true;
+}
+
+/* ---------------- Human interaction ---------------- */
+
+function trySelect(sel) {
+  if (G.over || aiBusy || G.current !== 0) return;
+  const src = resolveSource(sel, 0);
+  if (!src) { flash("Nothing to move there."); return; }
+  // toggle off if same
+  if (selected && selected.kind === sel.kind && selected.col === sel.col) {
+    selected = null; render(); return;
+  }
+  selected = sel;
+  render();
+}
+
+function tryPlace(target) {
+  if (G.over || aiBusy || G.current !== 0 || !selected) return;
+  const moved = doMove(selected, target, 0, true);
+  if (moved) {
+    selected = null;
+    render();
+    if (G.over) { endGame(); return; }
+    // auto-hint if no moves left
+    if (!hasAnyMove(0)) setStatus("No moves left — press “End Turn (Draw)”.");
+    else setStatus("Keep going, or press “End Turn (Draw)”.");
+  } else {
+    flash("That move isn't legal there.");
+  }
+}
+
+function endTurn() {
+  if (G.over || aiBusy || G.current !== 0) return;
+  drawCard(0);
+  selected = null;
+  history = [];
+  G.current = 1;
+  render();
+  setStatus("Computer is thinking…");
+  setTimeout(runAI, 550);
+}
+
+function undo() {
+  if (G.over || aiBusy || G.current !== 0) return;
+  if (history.length === 0) { flash("Nothing to undo this turn."); return; }
+  restore(history.pop());
+  selected = null;
+  render();
+}
+
+/* ---------------- AI (Player 2) ---------------- */
+/* Greedy, loop-safe: never does tableau->tableau (which could cycle).
+   Priority favours emptying its Reserve. */
+
+function bestAIMove() {
+  const player = 1;
+  const candidates = [];
+
+  function consider(sel, score) {
+    const src = resolveSource(sel, player);
+    if (!src) return;
+    for (const t of validTargets(src, player)) {
+      // Skip tableau->tableau for loop safety, EXCEPT onto an empty column
+      // fed from reserve (that always helps).
+      if (sel.kind === "tableau" && t.type === "tableau") continue;
+      let s = score;
+      if (t.type === "foundation") s += 100;           // progress off the board
+      if (sel.kind === "reserve") s += 60;             // emptying reserve = goal
+      if (sel.kind === "waste") s += 5;
+      if (t.type === "tableau" && G.tableau[t.i].length === 0) s += 2;
+      candidates.push({ sel, target: t, score: s });
+    }
+  }
+
+  consider({ kind: "reserve" }, 40);
+  consider({ kind: "waste" }, 10);
+  for (let c = 0; c < 8; c++) consider({ kind: "tableau", col: c }, 8);
+
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0];
+}
+
+function runAI() {
+  aiBusy = true;
+  let steps = 0;
+
+  function step() {
+    if (G.over) { aiBusy = false; endGame(); return; }
+    const mv = (steps < 40) ? bestAIMove() : null; // safety cap
+    if (mv) {
+      doMove(mv.sel, mv.target, 1, false);
+      steps++;
+      render();
+      if (G.over) { aiBusy = false; endGame(); return; }
+      setTimeout(step, 480);
+    } else {
+      // No more useful moves -> draw and end AI turn
+      drawCard(1);
+      render();
+      setTimeout(() => {
+        aiBusy = false;
+        G.current = 0;
+        render();
+        if (!hasAnyMove(0)) setStatus("Your turn — no moves? Press “End Turn (Draw)”.");
+        else setStatus("Your turn — tap a card, then a destination.");
+      }, 450);
+    }
+  }
+  setTimeout(step, 300);
+}
+
+/* ---------------- Rendering ---------------- */
+
+function cardEl(card, faceUp) {
+  const el = document.createElement("div");
+  if (!faceUp) {
+    el.className = "card back" + (card && card.color === "red" ? " red-back" : "");
+    return el;
+  }
+  el.className = "card " + card.color;
+  const ch = SUIT_CHAR[card.suit];
+  const rl = rankLabel(card.rank);
+  const isFace = card.rank > 10 || card.rank === 1;
+  el.innerHTML =
+    `<div class="corner"><span class="r">${rl}</span><span class="s">${ch}</span></div>` +
+    `<div class="pip${isFace ? " face" : ""}">${isFace ? rl + ch : ch}</div>` +
+    `<div class="corner br"><span class="r">${rl}</span><span class="s">${ch}</span></div>`;
+  return el;
+}
+
+// A reserve/stock/waste pile: single visible card + count badge.
+function pileGroup(caption, card, faceUp, count, onTap, opts) {
+  opts = opts || {};
+  const group = document.createElement("div");
+  group.className = "pile-group";
+
+  const holder = document.createElement("div");
+  holder.className = "pilecard";
+  if (card) {
+    const c = cardEl(card, faceUp);
+    if (opts.selectable) c.classList.add("movable");
+    if (opts.selected) c.classList.add("selected");
+    holder.appendChild(c);
+    if (count > 0) {
+      const b = document.createElement("div");
+      b.className = "count";
+      b.textContent = count;
+      holder.appendChild(b);
+    }
+  } else {
+    const e = document.createElement("div");
+    e.className = "empty-pile";
+    holder.appendChild(e);
+  }
+  if (onTap) holder.addEventListener("click", onTap);
+  group.appendChild(holder);
+
+  const cap = document.createElement("div");
+  cap.className = "pile-caption";
+  cap.textContent = caption;
+  group.appendChild(cap);
+  return group;
+}
+
+function render() {
+  // Status dot + reserve badges
+  const dot = document.getElementById("turnDot");
+  dot.className = "turn-dot " + (G.current === 0 ? "p1" : "p2");
+
+  const p1r = G.players[0].reserve.length;
+  const p2r = G.players[1].reserve.length;
+  const b1 = document.getElementById("p1reserve");
+  const b2 = document.getElementById("p2reserve");
+  b1.textContent = "Reserve: " + p1r;
+  b2.textContent = "Reserve: " + p2r;
+  b1.classList.toggle("win", p1r === 0);
+  b2.classList.toggle("win", p2r === 0);
+
+  const src = selected ? resolveSource(selected, 0) : null;
+  const targets = src ? validTargets(src, 0) : [];
+  const isTarget = (type, i) => targets.some(t => t.type === type && t.i === i);
+
+  /* ----- Player 2 (top) ----- */
+  const p2row = document.getElementById("p2row");
+  p2row.innerHTML = "";
+  const P2 = G.players[1];
+  p2row.appendChild(pileGroup("Reserve", topOf(P2.reserve), true, P2.reserve.length, null));
+  p2row.appendChild(pileGroup("Stock", topOf(P2.stock), false, P2.stock.length, null));
+  p2row.appendChild(pileGroup("Waste", topOf(P2.waste), true, P2.waste.length, null));
+
+  /* ----- Foundations ----- */
+  const fEl = document.getElementById("foundations");
+  fEl.innerHTML = "";
+  for (let i = 0; i < 8; i++) {
+    const f = G.foundations[i];
+    const slot = document.createElement("div");
+    slot.className = "slot foundation" + (isTarget("foundation", i) ? " valid-target" : "");
+    slot.setAttribute("data-hint", "A");
+    const t = topOf(f);
+    if (t) {
+      const c = cardEl(t, true);
+      slot.appendChild(c);
+      if (f.length > 1) {
+        const b = document.createElement("div");
+        b.className = "count"; b.textContent = f.length;
+        c.appendChild(b);
+      }
+    }
+    slot.addEventListener("click", () => tryPlace({ type: "foundation", i }));
+    fEl.appendChild(slot);
+  }
+
+  /* ----- Tableau ----- */
+  const tEl = document.getElementById("tableau");
+  tEl.innerHTML = "";
+  for (let i = 0; i < 8; i++) {
+    const col = G.tableau[i];
+    const slot = document.createElement("div");
+    slot.className = "slot tableau-slot" + (isTarget("tableau", i) ? " valid-target" : "");
+
+    const stack = document.createElement("div");
+    stack.className = "tableau-stack";
+    stack.style.position = "relative";
+    const off = getOffset();
+    stack.style.height = col.length > 0
+      ? (getCardH() + (col.length - 1) * off) + "px"
+      : getCardH() + "px";
+
+    col.forEach((card, idx) => {
+      const c = cardEl(card, true);
+      c.style.top = (idx * off) + "px";
+      const isTop = idx === col.length - 1;
+      if (isTop) {
+        c.classList.add("movable");
+        if (selected && selected.kind === "tableau" && selected.col === i) c.classList.add("selected");
+        c.addEventListener("click", (e) => {
+          e.stopPropagation();
+          // If we have a selection and this column is a valid target, place.
+          if (selected && isTarget("tableau", i)) { tryPlace({ type: "tableau", i }); return; }
+          trySelect({ kind: "tableau", col: i });
+        });
+      }
+      stack.appendChild(c);
+    });
+    slot.appendChild(stack);
+    // Tapping the (empty part of the) column tries to place there.
+    slot.addEventListener("click", () => tryPlace({ type: "tableau", i }));
+    tEl.appendChild(slot);
+  }
+
+  /* ----- Player 1 (bottom, you) ----- */
+  const p1row = document.getElementById("p1row");
+  p1row.innerHTML = "";
+  const P1 = G.players[0];
+  const myTurn = G.current === 0 && !G.over && !aiBusy;
+  p1row.appendChild(pileGroup("Reserve", topOf(P1.reserve), true, P1.reserve.length,
+    () => trySelect({ kind: "reserve" }),
+    { selectable: myTurn && P1.reserve.length > 0, selected: selected && selected.kind === "reserve" }));
+  p1row.appendChild(pileGroup("Stock", topOf(P1.stock), false, P1.stock.length, null));
+  p1row.appendChild(pileGroup("Waste", topOf(P1.waste), true, P1.waste.length,
+    () => trySelect({ kind: "waste" }),
+    { selectable: myTurn && P1.waste.length > 0, selected: selected && selected.kind === "waste" }));
+
+  // Controls
+  document.getElementById("endBtn").disabled = !myTurn;
+  document.getElementById("undoBtn").disabled = !myTurn || history.length === 0;
+}
+
+function getOffset() {
+  return parseInt(getComputedStyle(document.documentElement).getPropertyValue("--stack-offset")) || 20;
+}
+function getCardH() {
+  return parseInt(getComputedStyle(document.documentElement).getPropertyValue("--card-h")) || 82;
+}
+
+/* ---------------- UI chrome ---------------- */
+
+function setStatus(t) { document.getElementById("statusMsg").textContent = t; }
+
+let toastTimer = null;
+function flash(t) {
+  const el = document.getElementById("toast");
+  el.textContent = t;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 1500);
+}
+
+function endGame() {
+  const youWon = G.winner === 0;
+  showModal(
+    youWon ? "You Win! ♠♥♦♣" : "Computer Wins",
+    `<div class="big-result">${youWon ? "You emptied your Reserve first!" : "The computer emptied its Reserve first."}</div>
+     <p style="text-align:center">Final Reserve counts — You: <b>${G.players[0].reserve.length}</b> &nbsp;|&nbsp; Computer: <b>${G.players[1].reserve.length}</b></p>`,
+    [{ label: "New Game", primary: true, action: () => { hideModal(); newGame(); } }]
+  );
+  setStatus(youWon ? "You win!" : "Computer wins.");
+}
+
+function showRules() {
+  showModal("How to Play — Touch (Russian Bank)",
+    `<p><b>Goal:</b> be the first to empty your 13-card <b>Reserve</b> pile.</p>
+     <h3>On your turn</h3>
+     <ul>
+       <li>Tap one of your movable cards (<b>Reserve</b> top, <b>Waste</b> top, or any <b>Tableau</b> top). It highlights, and legal spots glow.</li>
+       <li>Tap a glowing <b>Foundation</b> or <b>Tableau</b> slot to move it.</li>
+       <li>Make as many moves as you like, then press <b>End Turn (Draw)</b> to draw from Stock to Waste — that ends your turn.</li>
+     </ul>
+     <h3>Building rules</h3>
+     <ul>
+       <li><b>Foundations</b> build <b>UP</b> by suit: A, 2, 3 … K (same suit).</li>
+       <li><b>Tableau</b> builds <b>DOWN</b> in alternating colours (e.g. red 10 on black J).</li>
+       <li>An <b>empty Tableau</b> slot must be filled from your <b>Reserve</b> first; only if your Reserve is empty may you fill it from Waste or Tableau.</li>
+     </ul>
+     <p style="opacity:.8">Two decks (104 cards). You are the bottom player; the computer plays the top.</p>`,
+    [{ label: "Got it", primary: true, action: hideModal }]
+  );
+}
+
+function showModal(title, bodyHtml, buttons) {
+  document.getElementById("modalTitle").textContent = title;
+  document.getElementById("modalBody").innerHTML = bodyHtml;
+  const foot = document.getElementById("modalFoot");
+  foot.innerHTML = "";
+  (buttons || []).forEach(b => {
+    const btn = document.createElement("button");
+    btn.className = "btn" + (b.primary ? " primary" : "");
+    btn.textContent = b.label;
+    btn.addEventListener("click", b.action);
+    foot.appendChild(btn);
+  });
+  document.getElementById("modal").classList.add("show");
+}
+function hideModal() { document.getElementById("modal").classList.remove("show"); }
+
+/* ---------------- Boot ---------------- */
+document.getElementById("newBtn").addEventListener("click", newGame);
+document.getElementById("rulesBtn").addEventListener("click", showRules);
+document.getElementById("endBtn").addEventListener("click", endTurn);
+document.getElementById("undoBtn").addEventListener("click", undo);
+window.addEventListener("resize", () => { if (G) render(); });
+
+newGame();
+// Show the rules once at first load.
+showRules();
+
+// Debug / test hook (safe to keep; used by headless tests).
+window.__touch = {
+  get state() { return G; },
+  canFoundation, canTableau, doMove, drawCard, hasAnyMove,
+  newGame, hideModal, endTurn,
+};
+</script>
+</body>
+</html>
