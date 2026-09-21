@@ -13,9 +13,12 @@
     --felt-1: #1f8a3b;
     --felt-2: #0a6b2a;
     --felt-edge: #064d1e;
-    --card-w: 58px;
-    --card-h: 82px;
-    --stack-offset: 20px;
+    /* Fluid defaults — scale with the smaller of viewport width/height so the
+       board fits iPhone (incl. SE / Pro Max) and Galaxy screens. JS fitLayout()
+       refines these precisely at runtime and on rotation. */
+    --card-w: clamp(38px, min(19.5vw, 9.2vh), 66px);
+    --card-h: calc(var(--card-w) * 1.4);
+    --stack-offset: calc(var(--card-h) * 0.26);
     --win-face: #ece9d8;      /* XP window face */
     --win-blue1: #245edb;     /* XP title gradient */
     --win-blue2: #3f8cf3;
@@ -52,7 +55,8 @@
     display: flex;
     flex-direction: column;
     position: relative;
-    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
+    overflow: hidden;                 /* zones manage their own scrolling */
+    padding: env(safe-area-inset-top) 0 0 0;  /* bottom inset handled by .controls */
   }
 
   /* ---------- Title bar (XP look) ---------- */
@@ -157,8 +161,10 @@
 
   .center {
     flex: 1 1 auto;
+    min-height: 0;                 /* allow the flex child to actually shrink+scroll */
     overflow-y: auto;
     overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
     padding: 6px 8px 10px;
     border-top: 2px solid rgba(0,0,0,.25);
     border-bottom: 2px solid rgba(0,0,0,.25);
@@ -210,6 +216,10 @@
     /* grows with stacked cards */
     min-height: var(--card-h);
     height: auto;
+  }
+  .tableau-slot.filled {
+    border-color: transparent;      /* hide the empty-slot outline behind cards */
+    background: transparent;
   }
 
   .slot.valid-target {
@@ -331,7 +341,7 @@
     flex: 0 0 auto;
     display: flex;
     gap: 8px;
-    padding: 8px;
+    padding: 8px 8px max(8px, env(safe-area-inset-bottom));
     justify-content: center;
     background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.18));
   }
@@ -417,13 +427,23 @@
   }
   .toast.show { opacity: 1; }
 
-  /* small screens tighten */
+  /* Short screens: tighten vertical padding so all three zones stay visible.
+     Card sizing itself is handled fluidly by the clamp() vars + fitLayout(). */
   @media (max-height: 720px) {
-    :root { --card-w: 50px; --card-h: 70px; --stack-offset: 17px; }
+    .zone { padding: 4px 8px; }
+    .zone-label { margin-bottom: 2px; }
   }
   @media (max-height: 620px) {
-    :root { --card-w: 44px; --card-h: 62px; --stack-offset: 15px; }
-    .zone { padding: 4px 6px; }
+    .zone { padding: 3px 6px; }
+    .center-section-label { margin: 1px 0 3px; }
+    .btn { padding: 6px 12px; }
+  }
+
+  /* Landscape / very short: shrink chrome further */
+  @media (max-height: 480px) {
+    .titlebar { font-size: 12px; padding: 2px 8px; }
+    .status { min-height: 20px; padding: 2px 8px; }
+    .zone { padding: 2px 6px; }
   }
 </style>
 </head>
@@ -900,19 +920,24 @@ function render() {
   for (let i = 0; i < 8; i++) {
     const col = G.tableau[i];
     const slot = document.createElement("div");
-    slot.className = "slot tableau-slot" + (isTarget("tableau", i) ? " valid-target" : "");
+    slot.className = "slot tableau-slot"
+      + (isTarget("tableau", i) ? " valid-target" : "")
+      + (col.length > 0 ? " filled" : "");
 
     const stack = document.createElement("div");
     stack.className = "tableau-stack";
     stack.style.position = "relative";
-    const off = getOffset();
-    stack.style.height = col.length > 0
-      ? (getCardH() + (col.length - 1) * off) + "px"
-      : getCardH() + "px";
+    // Adaptive overlap: when a column holds many cards, compress the offset so
+    // the stack never grows unbounded and hides other zones. The top (playable)
+    // card stays fully visible; buried cards still show their rank/suit corner.
+    const off = columnOffset(col.length);
+    const ch = getCardH();
+    stack.style.height = (col.length > 0 ? ch + (col.length - 1) * off : ch) + "px";
 
     col.forEach((card, idx) => {
       const c = cardEl(card, true);
       c.style.top = (idx * off) + "px";
+      c.style.zIndex = String(idx + 1);
       const isTop = idx === col.length - 1;
       if (isTop) {
         c.classList.add("movable");
@@ -951,10 +976,47 @@ function render() {
 }
 
 function getOffset() {
-  return parseInt(getComputedStyle(document.documentElement).getPropertyValue("--stack-offset")) || 20;
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--stack-offset")) || 20;
 }
 function getCardH() {
-  return parseInt(getComputedStyle(document.documentElement).getPropertyValue("--card-h")) || 82;
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--card-h")) || 82;
+}
+
+// Overlap offset for a tableau column of length n. Compresses as the column
+// grows so a long sequence stays within a sensible height (the top card is
+// always fully visible; buried cards keep >= ~13px so their corner shows).
+function columnOffset(n) {
+  const base = getOffset();
+  if (n <= 1) return base;
+  const ch = getCardH();
+  const budget = 3.2 * ch;                     // preferred max stack height
+  const fit = (budget - ch) / (n - 1);
+  return Math.max(13, Math.min(base, fit));
+}
+
+// Precisely size cards to the live viewport (belt-and-suspenders over the CSS
+// clamp) so the board fits any phone — iPhone SE..Pro Max and Galaxy — and
+// re-fits on rotation / browser-chrome show-hide.
+function fitLayout() {
+  const vv = window.visualViewport;
+  const vw = Math.min((vv && vv.width) || window.innerWidth, 480);
+  const vh = (vv && vv.height) || window.innerHeight;
+
+  // Width budget: 4 columns, center side padding (8*2) + 3 gaps (6).
+  const byWidth = (vw - 16 - 3 * 6) / 4;
+  // Height budget: keep cards small enough that fixed zones + a foundation row
+  // remain visible without scrolling on typical portrait screens.
+  const byHeight = vh / 11.5;
+
+  let cw = Math.floor(Math.min(byWidth, byHeight));
+  cw = Math.max(38, Math.min(cw, 66));
+  const chh = Math.round(cw * 1.4);
+  const off = Math.round(chh * 0.26);
+
+  const root = document.documentElement.style;
+  root.setProperty("--card-w", cw + "px");
+  root.setProperty("--card-h", chh + "px");
+  root.setProperty("--stack-offset", off + "px");
 }
 
 /* ---------------- UI chrome ---------------- */
@@ -1022,8 +1084,13 @@ document.getElementById("newBtn").addEventListener("click", newGame);
 document.getElementById("rulesBtn").addEventListener("click", showRules);
 document.getElementById("endBtn").addEventListener("click", endTurn);
 document.getElementById("undoBtn").addEventListener("click", undo);
-window.addEventListener("resize", () => { if (G) render(); });
 
+function relayout() { fitLayout(); if (G) render(); }
+window.addEventListener("resize", relayout);
+window.addEventListener("orientationchange", () => setTimeout(relayout, 150));
+if (window.visualViewport) window.visualViewport.addEventListener("resize", relayout);
+
+fitLayout();
 newGame();
 // Show the rules once at first load.
 showRules();
@@ -1033,6 +1100,7 @@ window.__touch = {
   get state() { return G; },
   canFoundation, canTableau, doMove, drawCard, hasAnyMove,
   resolveSource, validTargets, snapshot, restore,
+  columnOffset, fitLayout,
   newGame, hideModal, endTurn,
 };
 </script>
