@@ -140,7 +140,7 @@ const DEVICES = [
   });
   const rBefore = await page.evaluate(() => window.__touch.state.players[0].reserve.length);
   await page.click("#p1row .pile-group:first-child .pilecard");
-  await page.click("#foundations .slot:first-child");
+  await page.click('[data-fi="0"]');
   const afterMove = await page.evaluate(() => ({ r: window.__touch.state.players[0].reserve.length, f: window.__touch.state.foundations[0].length }));
   check("move reserve->foundation", afterMove.r === rBefore - 1 && afterMove.f === 1, afterMove);
   await page.click("#undoBtn");
@@ -153,7 +153,7 @@ const DEVICES = [
     g.foundations[0] = []; g.current = 0; window.dispatchEvent(new Event("resize"));
   });
   await page.click("#p1row .pile-group:first-child .pilecard");
-  await page.click("#foundations .slot:first-child");
+  await page.click('[data-fi="0"]');
   const win = await page.evaluate(() => ({ over: window.__touch.state.over, winner: window.__touch.state.winner, modal: document.getElementById("modal").classList.contains("show") }));
   check("emptying reserve wins + shows modal", win.over && win.winner === 0 && win.modal, win);
   await page.close();

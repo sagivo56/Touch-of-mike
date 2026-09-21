@@ -27,10 +27,14 @@ Be the **first player to empty your 13-card Reserve pile.**
 Two standard 52-card decks (104 cards total). The screen has three zones:
 
 - **Player 2 (top, computer):** Reserve (13 cards, top face up), Stock (draw pile), Waste.
-- **Center (shared):**
-  - **8 Foundations** — build **UP** by suit, Ace → King.
-  - **8 Tableau** slots — the maneuvering area; build **DOWN** in alternating colors.
+- **Center (shared)** — laid out the traditional Russian Bank way, as four vertical
+  columns: **tableau | foundations | foundations | tableau**.
+  - **8 Foundations** (the two middle columns) — build **UP** by suit, Ace → King.
+  - **8 Tableau** piles (the two outer columns) — the maneuvering area; build **DOWN**
+    in alternating colors, cascading downward.
 - **Player 1 (bottom, you):** Reserve, Stock, Waste.
+
+The whole interface is in **Hebrew, right-to-left**.
 
 ## How to play (touch-friendly, tap-to-move)
 

@@ -180,15 +180,33 @@
     text-shadow: 1px 1px 0 rgba(0,0,0,.4);
   }
 
-  .grid4 {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px 6px;
-    justify-items: center;
+  /* Traditional Russian Bank table: four vertical columns
+     (tableau | foundations | foundations | tableau). */
+  .center-legend {
+    text-align: center;
+    font-size: 11px;
+    opacity: .8;
+    margin: 0 0 8px;
+    text-shadow: 1px 1px 0 rgba(0,0,0,.4);
   }
-  .tableau-grid {
-    margin-top: 8px;
-    align-items: start;
+  .table-layout {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+  .foundation-col {
+    /* subtle inset so the middle "foundation" columns read as the core */
+    background: rgba(0,0,0,.10);
+    border-radius: 6px;
+    padding: 4px 3px;
   }
 
   /* ---------- Slots ---------- */
@@ -472,13 +490,16 @@
     <div class="player-row" id="p2row"></div>
   </div>
 
-  <!-- Center shared area -->
+  <!-- Center shared area — traditional Russian Bank layout:
+       foundations in the two middle columns, tableau on the two outer columns. -->
   <div class="center">
-    <div class="center-section-label">בסיסים — בנייה כלפי מעלה לפי צורה, מהאס ועד המלך</div>
-    <div class="grid4" id="foundations"></div>
-
-    <div class="center-section-label" style="margin-top:10px">טבלה — בנייה כלפי מטה בצבעים מתחלפים</div>
-    <div class="grid4 tableau-grid" id="tableau"></div>
+    <div class="center-legend">טבלה בצדדים · בסיסים במרכז</div>
+    <div class="table-layout">
+      <div class="col tableau-col" id="tabLeft"></div>
+      <div class="col foundation-col" id="fLeft"></div>
+      <div class="col foundation-col" id="fRight"></div>
+      <div class="col tableau-col" id="tabRight"></div>
+    </div>
   </div>
 
   <!-- Player 1 (you) -->
@@ -893,14 +914,13 @@ function render() {
   p2row.appendChild(pileGroup("חפיסה", topOf(P2.stock), false, P2.stock.length, null));
   p2row.appendChild(pileGroup("פסולת", topOf(P2.waste), true, P2.waste.length, null));
 
-  /* ----- Foundations ----- */
-  const fEl = document.getElementById("foundations");
-  fEl.innerHTML = "";
-  for (let i = 0; i < 8; i++) {
+  /* ----- Foundations (two middle columns: 0-3 left, 4-7 right) ----- */
+  function renderFoundation(i) {
     const f = G.foundations[i];
     const slot = document.createElement("div");
     slot.className = "slot foundation" + (isTarget("foundation", i) ? " valid-target" : "");
     slot.setAttribute("data-hint", "A");
+    slot.setAttribute("data-fi", i);
     const t = topOf(f);
     if (t) {
       const c = cardEl(t, true);
@@ -912,25 +932,23 @@ function render() {
       }
     }
     slot.addEventListener("click", () => tryPlace({ type: "foundation", i }));
-    fEl.appendChild(slot);
+    return slot;
   }
 
-  /* ----- Tableau ----- */
-  const tEl = document.getElementById("tableau");
-  tEl.innerHTML = "";
-  for (let i = 0; i < 8; i++) {
+  /* ----- Tableau piles (two outer columns: 0-3 left, 4-7 right) ----- */
+  function renderTableau(i) {
     const col = G.tableau[i];
     const slot = document.createElement("div");
     slot.className = "slot tableau-slot"
       + (isTarget("tableau", i) ? " valid-target" : "")
       + (col.length > 0 ? " filled" : "");
+    slot.setAttribute("data-ti", i);
 
     const stack = document.createElement("div");
     stack.className = "tableau-stack";
     stack.style.position = "relative";
-    // Adaptive overlap: when a column holds many cards, compress the offset so
-    // the stack never grows unbounded and hides other zones. The top (playable)
-    // card stays fully visible; buried cards still show their rank/suit corner.
+    // Adaptive overlap: long piles compress so the top (playable) card stays
+    // fully visible while buried cards still show their rank/suit corner.
     const off = columnOffset(col.length);
     const ch = getCardH();
     stack.style.height = (col.length > 0 ? ch + (col.length - 1) * off : ch) + "px";
@@ -939,13 +957,11 @@ function render() {
       const c = cardEl(card, true);
       c.style.top = (idx * off) + "px";
       c.style.zIndex = String(idx + 1);
-      const isTop = idx === col.length - 1;
-      if (isTop) {
+      if (idx === col.length - 1) {
         c.classList.add("movable");
         if (selected && selected.kind === "tableau" && selected.col === i) c.classList.add("selected");
         c.addEventListener("click", (e) => {
           e.stopPropagation();
-          // If we have a selection and this column is a valid target, place.
           if (selected && isTarget("tableau", i)) { tryPlace({ type: "tableau", i }); return; }
           trySelect({ kind: "tableau", col: i });
         });
@@ -953,9 +969,20 @@ function render() {
       stack.appendChild(c);
     });
     slot.appendChild(stack);
-    // Tapping the (empty part of the) column tries to place there.
     slot.addEventListener("click", () => tryPlace({ type: "tableau", i }));
-    tEl.appendChild(slot);
+    return slot;
+  }
+
+  const tabLeft = document.getElementById("tabLeft");
+  const tabRight = document.getElementById("tabRight");
+  const fLeft = document.getElementById("fLeft");
+  const fRight = document.getElementById("fRight");
+  tabLeft.innerHTML = ""; tabRight.innerHTML = ""; fLeft.innerHTML = ""; fRight.innerHTML = "";
+  for (let i = 0; i < 4; i++) {
+    tabLeft.appendChild(renderTableau(i));
+    tabRight.appendChild(renderTableau(i + 4));
+    fLeft.appendChild(renderFoundation(i));
+    fRight.appendChild(renderFoundation(i + 4));
   }
 
   /* ----- Player 1 (bottom, you) ----- */
@@ -1005,9 +1032,9 @@ function fitLayout() {
 
   // Width budget: 4 columns, center side padding (8*2) + 3 gaps (6).
   const byWidth = (vw - 16 - 3 * 6) / 4;
-  // Height budget: keep cards small enough that fixed zones + a foundation row
-  // remain visible without scrolling on typical portrait screens.
-  const byHeight = vh / 11.5;
+  // Height budget: the traditional layout stacks 4 rows in the middle plus the
+  // two player zones, so keep cards small enough that it mostly fits portrait.
+  const byHeight = (vh - 120) / 10;
 
   let cw = Math.floor(Math.min(byWidth, byHeight));
   cw = Math.max(38, Math.min(cw, 66));
