@@ -1117,8 +1117,12 @@ const Music = (() => {
   ];
   const loopDur = 32 * beat;             // 8 bars of 4/4
 
+  // 0.05s of silence — looped through an <audio> element on the unlock gesture.
+  // On iOS this switches the audio session to "playback", so Web Audio is heard
+  // even when the phone's ring/silent switch is set to silent.
+  const SILENT_WAV = "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
   let ctx = null, tone = null, drumBus = null, started = false, timer = null, nextLoop = 0;
-  let noiseBuf = null;
+  let noiseBuf = null, silentEl = null;
   let enabled = true;
   try { enabled = localStorage.getItem("touch-music") !== "off"; } catch (e) {}
 
@@ -1171,18 +1175,18 @@ const Music = (() => {
   function scheduleLoop(start) {
     // Lead melody (square)
     let t = start;
-    for (const [m, b] of MELODY) { chip(t, m, b * beat * 0.9, "square", 0.12, tone); t += b * beat; }
+    for (const [m, b] of MELODY) { chip(t, m, b * beat * 0.9, "square", 0.17, tone); t += b * beat; }
 
     for (let bar = 0; bar < 8; bar++) {
       const b0 = start + bar * 4 * beat;
       const ch = BARS[bar];
       // Triangle bass — root on each beat, with an octave lift on beat 3 for bounce.
       for (let q = 0; q < 4; q++) {
-        chip(b0 + q * beat, ch.bass + (q === 2 ? 12 : 0), beat * 0.85, "triangle", 0.16, tone);
+        chip(b0 + q * beat, ch.bass + (q === 2 ? 12 : 0), beat * 0.85, "triangle", 0.2, tone);
       }
       // Pulse arpeggio — eighth notes cycling the chord tones.
       for (let e = 0; e < 8; e++) {
-        chip(b0 + e * eighth, ch.arp[e % ch.arp.length], eighth * 0.7, "square", 0.045, tone);
+        chip(b0 + e * eighth, ch.arp[e % ch.arp.length], eighth * 0.7, "square", 0.06, tone);
       }
       // Drums — 16 steps: kick (1 & 3), snare (2 & 4), hats on every 8th.
       for (let s = 0; s < 16; s++) {
@@ -1206,7 +1210,7 @@ const Music = (() => {
       if (!AC) return false;
       ctx = new AC();
       const master = ctx.createGain();
-      master.gain.value = 0.28;
+      master.gain.value = 0.42;
       master.connect(ctx.destination);
       // Tonal channels run through a gentle low-pass to tame square-wave harshness
       // while keeping the crunchy 8-bit character.
@@ -1227,14 +1231,33 @@ const Music = (() => {
     } catch (e) { ctx = null; return false; }
   }
 
+  const isRunning = () => started && !!ctx && ctx.state === "running";
+
+  // Play a silent looping media element to unlock audio on iOS (see SILENT_WAV).
+  function unlockMedia() {
+    try {
+      if (!silentEl) {
+        silentEl = new Audio(SILENT_WAV);
+        silentEl.loop = true; silentEl.volume = 0;
+        silentEl.setAttribute("playsinline", "");
+      }
+      const p = silentEl.play();
+      if (p && p.catch) p.catch(() => {});
+    } catch (e) {}
+  }
+
+  // Idempotent: safe to call on every gesture. Always (re)resumes the context.
   function start() {
-    if (started || !enabled) return;
+    if (!enabled) return;
     if (!init()) return;
-    if (ctx.state === "suspended") ctx.resume().catch(() => {});
-    nextLoop = ctx.currentTime + 0.15;
+    unlockMedia();
+    if (ctx.state !== "running") ctx.resume().catch(() => {});
+    if (!started) {
+      nextLoop = ctx.currentTime + 0.12;
+      timer = setInterval(tick, 200);
+      started = true;
+    }
     tick();
-    timer = setInterval(tick, 200);
-    started = true;
     updateBtn();
   }
 
@@ -1245,6 +1268,8 @@ const Music = (() => {
     updateBtn();
   }
 
+  // Tap the button to flip the preference: on -> start (create/resume the
+  // context in this gesture), off -> stop.
   function toggle() {
     enabled = !enabled;
     try { localStorage.setItem("touch-music", enabled ? "on" : "off"); } catch (e) {}
@@ -1260,7 +1285,7 @@ const Music = (() => {
   }
 
   return {
-    start, toggle, updateBtn,
+    start, stop, toggle, updateBtn, isRunning,
     isEnabled: () => enabled,
     isStarted: () => started,
   };
@@ -1274,14 +1299,18 @@ document.getElementById("undoBtn").addEventListener("click", undo);
 document.getElementById("musicBtn").addEventListener("click", Music.toggle);
 Music.updateBtn();
 
-// Browsers block audio until a user gesture — start on the first tap anywhere.
-function primeAudio() {
+// Browsers block audio until a user gesture. Try to start on every early
+// interaction and keep listening until the audio context is actually running
+// (some browsers ignore the very first attempt).
+const primeEvents = ["pointerdown", "touchend", "click", "keydown"];
+function primeAudio(e) {
+  if (e && e.target && e.target.id === "musicBtn") return; // the button controls itself
   Music.start();
-  window.removeEventListener("pointerdown", primeAudio);
-  window.removeEventListener("keydown", primeAudio);
+  if (Music.isRunning()) primeEvents.forEach((e2) => window.removeEventListener(e2, primeAudio));
 }
-window.addEventListener("pointerdown", primeAudio);
-window.addEventListener("keydown", primeAudio);
+primeEvents.forEach((e) => window.addEventListener(e, primeAudio, { passive: true }));
+// Resume when returning to the tab (mobile browsers suspend on background).
+document.addEventListener("visibilitychange", () => { if (!document.hidden && Music.isEnabled()) Music.start(); });
 
 function relayout() { fitLayout(); if (G) render(); }
 window.addEventListener("resize", relayout);
