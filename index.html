@@ -1087,9 +1087,13 @@ function hideModal() { document.getElementById("modal").classList.remove("show")
    the Web Audio API (no audio files, no copyrighted recordings).
    ============================================================ */
 const Music = (() => {
-  const BPM = 84;
+  // Vintage 8-bit / chiptune (NES-style): square-wave lead, triangle bass,
+  // a fast pulse arpeggio, and a noise channel for drums. Dry, gated envelopes.
+  const BPM = 96;
   const beat = 60 / BPM;                 // seconds per quarter note
-  // [midiNote, beats]  (0 = rest). D harmonic minor: D E F G A Bb C#.
+  const eighth = beat / 2;
+  const sixteenth = beat / 4;
+  // Lead melody — [midiNote, beats] (0 = rest). D harmonic minor: D E F G A Bb C#.
   const MELODY = [
     [69,1],[69,1],[65,1],[69,1],         // Dm
     [67,1],[70,1],[74,1],[70,1],         // Gm
@@ -1100,41 +1104,93 @@ const Music = (() => {
     [70,1],[67,1],[70,1],[74,1],         // Gm
     [73,2],[69,2],                       // A  (aug-2nd Bb->C# color)
   ];
-  const BASS = [
-    [38,4],[43,4],[45,4],[38,4],
-    [38,4],[46,4],[43,4],[45,4],
+  // Per-bar harmony: {bass root midi, arpeggio chord tones}.
+  const BARS = [
+    { bass: 38, arp: [62, 65, 69] },     // Dm
+    { bass: 43, arp: [67, 70, 74] },     // Gm
+    { bass: 45, arp: [69, 73, 76] },     // A  (major dominant)
+    { bass: 38, arp: [62, 65, 69] },     // Dm
+    { bass: 38, arp: [62, 65, 69] },     // Dm
+    { bass: 46, arp: [70, 74, 77] },     // Bb
+    { bass: 43, arp: [67, 70, 74] },     // Gm
+    { bass: 45, arp: [69, 73, 76] },     // A
   ];
   const loopDur = 32 * beat;             // 8 bars of 4/4
 
-  let ctx = null, master = null, started = false, timer = null, nextLoop = 0;
+  let ctx = null, tone = null, drumBus = null, started = false, timer = null, nextLoop = 0;
+  let noiseBuf = null;
   let enabled = true;
   try { enabled = localStorage.getItem("touch-music") !== "off"; } catch (e) {}
 
   const freq = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
-  function voice(time, midi, dur, type, peak, dest) {
+  // A gated tone voice — square (lead/arp) or triangle (bass). Sharp attack,
+  // brief sustain, quick release: the classic chip envelope.
+  function chip(time, midi, dur, type, peak, dest) {
     if (midi <= 0) return;
     const o = ctx.createOscillator();
     o.type = type;
-    o.frequency.value = freq(midi);
+    o.frequency.setValueAtTime(freq(midi), time);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, time);
-    g.gain.exponentialRampToValueAtTime(peak, time + 0.03);
-    g.gain.exponentialRampToValueAtTime(peak * 0.6, time + dur * 0.5);
-    g.gain.exponentialRampToValueAtTime(0.0001, time + dur * 0.98);
+    g.gain.linearRampToValueAtTime(peak, time + 0.006);
+    g.gain.setValueAtTime(peak, time + Math.max(0.02, dur * 0.55));
+    g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
     o.connect(g).connect(dest);
     o.start(time);
-    o.stop(time + dur);
+    o.stop(time + dur + 0.02);
+  }
+
+  // Punchy pitch-dropping kick.
+  function kick(time) {
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.setValueAtTime(130, time);
+    o.frequency.exponentialRampToValueAtTime(45, time + 0.11);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.linearRampToValueAtTime(0.26, time + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + 0.16);
+    o.connect(g).connect(drumBus);
+    o.start(time); o.stop(time + 0.18);
+  }
+
+  // Filtered noise burst — snare (bandpass) or hi-hat (highpass).
+  function noise(time, dur, filterType, hz, peak) {
+    const s = ctx.createBufferSource();
+    s.buffer = noiseBuf;
+    const f = ctx.createBiquadFilter();
+    f.type = filterType; f.frequency.value = hz;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(peak, time);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+    s.connect(f).connect(g).connect(drumBus);
+    s.start(time); s.stop(time + dur + 0.02);
   }
 
   function scheduleLoop(start) {
+    // Lead melody (square)
     let t = start;
-    for (const [m, b] of MELODY) { voice(t, m, b * beat * 0.96, "triangle", 0.16, master); t += b * beat; }
-    t = start;
-    for (const [m, b] of BASS) {
-      voice(t, m, b * beat * 0.96, "sine", 0.22, master);       // root
-      voice(t, m + 7, b * beat * 0.96, "sine", 0.07, master);   // soft fifth
-      t += b * beat;
+    for (const [m, b] of MELODY) { chip(t, m, b * beat * 0.9, "square", 0.12, tone); t += b * beat; }
+
+    for (let bar = 0; bar < 8; bar++) {
+      const b0 = start + bar * 4 * beat;
+      const ch = BARS[bar];
+      // Triangle bass — root on each beat, with an octave lift on beat 3 for bounce.
+      for (let q = 0; q < 4; q++) {
+        chip(b0 + q * beat, ch.bass + (q === 2 ? 12 : 0), beat * 0.85, "triangle", 0.16, tone);
+      }
+      // Pulse arpeggio — eighth notes cycling the chord tones.
+      for (let e = 0; e < 8; e++) {
+        chip(b0 + e * eighth, ch.arp[e % ch.arp.length], eighth * 0.7, "square", 0.045, tone);
+      }
+      // Drums — 16 steps: kick (1 & 3), snare (2 & 4), hats on every 8th.
+      for (let s = 0; s < 16; s++) {
+        const dt = b0 + s * sixteenth;
+        if (s === 0 || s === 8) kick(dt);
+        if (s === 4 || s === 12) noise(dt, 0.13, "bandpass", 1800, 0.14);
+        if (s % 2 === 0) noise(dt, 0.03, "highpass", 8000, 0.04);
+      }
     }
   }
 
@@ -1149,17 +1205,24 @@ const Music = (() => {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return false;
       ctx = new AC();
-      master = ctx.createGain();
-      master.gain.value = 0.32;
-      // gentle ambience: short feedback delay bus
-      const delay = ctx.createDelay();
-      delay.delayTime.value = 0.19;
-      const fb = ctx.createGain();
-      fb.gain.value = 0.22;
-      const wet = ctx.createGain();
-      wet.gain.value = 0.5;
+      const master = ctx.createGain();
+      master.gain.value = 0.28;
       master.connect(ctx.destination);
-      master.connect(delay); delay.connect(fb); fb.connect(delay); delay.connect(wet); wet.connect(ctx.destination);
+      // Tonal channels run through a gentle low-pass to tame square-wave harshness
+      // while keeping the crunchy 8-bit character.
+      tone = ctx.createGain();
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass"; lp.frequency.value = 5200;
+      tone.connect(lp).connect(master);
+      // Drums go straight to master (full range).
+      drumBus = ctx.createGain();
+      drumBus.gain.value = 0.9;
+      drumBus.connect(master);
+      // One second of white noise, reused for every drum hit.
+      const n = Math.floor(ctx.sampleRate);
+      noiseBuf = ctx.createBuffer(1, n, ctx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
       return true;
     } catch (e) { ctx = null; return false; }
   }

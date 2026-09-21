@@ -56,11 +56,13 @@ Two standard 52-card decks (104 cards total). The screen has three zones:
 
 ## Background music
 
-An original, looping piece in **D harmonic minor** — with the raised-7th /
-augmented-second colour characteristic of Russian romantic music — is synthesized
-live with the Web Audio API (no audio files, no copyrighted recordings). Browsers
-block audio until you interact, so it starts on your first tap; toggle it any time
-with the **♫ Music** button in the title bar (your choice is remembered).
+An original, looping **8-bit / chiptune** piece (NES-style: square-wave lead,
+triangle bass, a fast pulse arpeggio, and a noise channel for drums) in
+**D harmonic minor** — with the raised-7th / augmented-second colour characteristic
+of Russian romantic music. It's synthesized live with the Web Audio API (no audio
+files, no copyrighted recordings). Browsers block audio until you interact, so it
+starts on your first tap; toggle it any time with the **♫ Music** button in the
+title bar (your choice is remembered).
 
 ## Responsive design
 
