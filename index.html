@@ -419,25 +419,30 @@
 
   /* ---------- Modal ---------- */
   .modal-backdrop {
-    position: absolute;
+    position: fixed;
     inset: 0;
     background: rgba(0,0,0,.45);
     display: none;
     align-items: center;
     justify-content: center;
     z-index: 200;
-    padding: 16px;
+    padding: max(10px, env(safe-area-inset-top)) 12px max(10px, env(safe-area-inset-bottom));
   }
   .modal-backdrop.show { display: flex; }
   .modal {
     width: 100%;
     max-width: 340px;
+    /* Never taller than the screen — body scrolls, title + button stay put. */
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
     background: var(--win-face);
     color: #000;
     border: 2px outset #fff;
     box-shadow: 3px 3px 0 rgba(0,0,0,.4);
   }
   .modal .m-title {
+    flex: 0 0 auto;
     background: linear-gradient(180deg, var(--win-blue2), var(--win-blue1));
     color: #fff;
     font-weight: bold;
@@ -446,6 +451,10 @@
     text-shadow: 1px 1px 0 rgba(0,0,0,.4);
   }
   .modal .m-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     padding: 12px;
     font-size: 13px;
     line-height: 1.45;
@@ -453,11 +462,14 @@
   .modal .m-body h3 { margin: 8px 0 4px; font-size: 13px; }
   .modal .m-body ul { margin: 4px 0; padding-inline-start: 18px; }
   .modal .m-body li { margin: 2px 0; }
+  .modal .m-body p:first-child { margin-top: 0; }
   .modal .m-foot {
+    flex: 0 0 auto;
     padding: 8px 12px 12px;
     display: flex;
     gap: 8px;
     justify-content: flex-end;
+    border-top: 1px solid rgba(0,0,0,.12);
   }
   .big-result { text-align:center; font-size: 18px; font-weight: bold; margin: 6px 0; }
 
