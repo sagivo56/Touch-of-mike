@@ -38,7 +38,8 @@ Two standard 52-card decks (104 cards total). The screen has three zones:
   columns: **tableau | foundations | foundations | tableau**.
   - **8 Foundations** (the two middle columns) — build **UP** by suit, Ace → King.
   - **8 Tableau** piles (the two outer columns) — the maneuvering area; build **DOWN**
-    in alternating colors, cascading downward.
+    in alternating colors. Piles fan **sideways** (outward toward the edges), with the
+    top card nearest the foundations, matching a real Touch table.
 - **Player 1 (bottom, you):** Reserve, Stock, Waste.
 
 The whole interface is in **Hebrew, right-to-left**.

@@ -244,16 +244,20 @@ const DEVICES = [
       const end = document.getElementById("endBtn").getBoundingClientRect();
       const p1 = document.getElementById("p1row").getBoundingClientRect();
       const p2 = document.getElementById("p2row").getBoundingClientRect();
-      const center = document.querySelector(".center");
+      // The deep 18-card pile must fan sideways within its side (no overflow).
+      const pile = document.querySelector('[data-ti="0"]');
+      const side = pile && pile.closest(".side");
+      const pileFits = !pile || !side || pile.getBoundingClientRect().width <= side.getBoundingClientRect().width + 1;
       return {
         endVisible: end.bottom <= innerHeight + 0.5 && end.top >= 0,
         p1Visible: p1.bottom <= innerHeight + 0.5 && p1.top >= 0,
         p2Visible: p2.top >= 0,
         noHOverflow: document.documentElement.scrollWidth <= innerWidth + 1,
-        centerScrolls: center.scrollHeight > center.clientHeight,
+        pileCards: pile ? pile.querySelectorAll(".card").length : 0,
+        pileFits,
       };
     });
-    check(`${d.name} (${d.w}x${d.h})`, mt.endVisible && mt.p1Visible && mt.p2Visible && mt.noHOverflow && mt.centerScrolls, mt);
+    check(`${d.name} (${d.w}x${d.h})`, mt.endVisible && mt.p1Visible && mt.p2Visible && mt.noHOverflow && mt.pileFits && mt.pileCards === 18, mt);
     await page.close();
   }
 
