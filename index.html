@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#008000" />
-<title>Touch — Russian Bank Solitaire</title>
+<title>טאץ׳ — סוליטר בנק רוסי</title>
 <style>
   /* =========================================================
      TOUCH (Russian Bank) — Classic Win95/XP Solitaire styling
@@ -397,7 +397,7 @@
     line-height: 1.45;
   }
   .modal .m-body h3 { margin: 8px 0 4px; font-size: 13px; }
-  .modal .m-body ul { margin: 4px 0; padding-left: 18px; }
+  .modal .m-body ul { margin: 4px 0; padding-inline-start: 18px; }
   .modal .m-body li { margin: 2px 0; }
   .modal .m-foot {
     padding: 8px 12px 12px;
@@ -450,49 +450,49 @@
 <body>
 <div id="app">
   <div class="titlebar">
-    <span class="ico">T</span>
-    <span>Touch — Russian Bank Solitaire</span>
+    <span class="ico">ט</span>
+    <span>טאץ׳ — בנק רוסי</span>
     <span class="spacer"></span>
-    <button id="musicBtn" title="Toggle background music" aria-label="Toggle music">&#9834; Music</button>
-    <button id="rulesBtn">Rules</button>
-    <button id="newBtn">New</button>
+    <button id="musicBtn" title="הפעלה/כיבוי מוזיקה" aria-label="החלפת מצב מוזיקה">&#9834; מוזיקה</button>
+    <button id="rulesBtn">חוקים</button>
+    <button id="newBtn">חדש</button>
   </div>
 
   <div class="status">
     <span class="turn-dot" id="turnDot"></span>
-    <span class="msg" id="statusMsg">Your move</span>
+    <span class="msg" id="statusMsg">תורך</span>
   </div>
 
   <!-- Player 2 (opponent / AI) -->
   <div class="zone" id="p2zone">
     <div class="zone-label">
-      <span id="p2name">Player 2 (Computer)</span>
-      <span class="badge" id="p2reserve">Reserve: 13</span>
+      <span id="p2name">יריב (מחשב)</span>
+      <span class="badge" id="p2reserve">רזרבה: 13</span>
     </div>
     <div class="player-row" id="p2row"></div>
   </div>
 
   <!-- Center shared area -->
   <div class="center">
-    <div class="center-section-label">Foundations — build UP by suit (A → K)</div>
+    <div class="center-section-label">בסיסים — בנייה כלפי מעלה לפי צורה, מהאס ועד המלך</div>
     <div class="grid4" id="foundations"></div>
 
-    <div class="center-section-label" style="margin-top:10px">Tableau — build DOWN in alternating colours</div>
+    <div class="center-section-label" style="margin-top:10px">טבלה — בנייה כלפי מטה בצבעים מתחלפים</div>
     <div class="grid4 tableau-grid" id="tableau"></div>
   </div>
 
   <!-- Player 1 (you) -->
   <div class="zone" id="p1zone">
     <div class="zone-label">
-      <span id="p1name">Player 1 (You)</span>
-      <span class="badge" id="p1reserve">Reserve: 13</span>
+      <span id="p1name">שחקן (אתה)</span>
+      <span class="badge" id="p1reserve">רזרבה: 13</span>
     </div>
     <div class="player-row" id="p1row"></div>
   </div>
 
   <div class="controls">
-    <button class="btn" id="undoBtn" title="Take back moves this turn">Undo</button>
-    <button class="btn primary" id="endBtn">End Turn (Draw)</button>
+    <button class="btn" id="undoBtn" title="ביטול מהלכים בתור זה">ביטול</button>
+    <button class="btn primary" id="endBtn">סיום תור (משיכה)</button>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -500,7 +500,7 @@
   <!-- Rules / result modal -->
   <div class="modal-backdrop" id="modal">
     <div class="modal">
-      <div class="m-title" id="modalTitle">How to Play — Touch</div>
+      <div class="m-title" id="modalTitle">איך משחקים — טאץ׳</div>
       <div class="m-body" id="modalBody"></div>
       <div class="m-foot" id="modalFoot"></div>
     </div>
@@ -571,7 +571,7 @@ function newGame() {
   history = [];
   aiBusy = false;
   render();
-  setStatus("Your move — tap a card, then tap where to place it.");
+  setStatus("תורך — הקש על קלף, ואז הקש לאן להניח אותו.");
 }
 
 /* ---------------- Rule helpers ---------------- */
@@ -698,7 +698,7 @@ function drawCard(player) {
 function trySelect(sel) {
   if (G.over || aiBusy || G.current !== 0) return;
   const src = resolveSource(sel, 0);
-  if (!src) { flash("Nothing to move there."); return; }
+  if (!src) { flash("אין מה להזיז שם."); return; }
   // toggle off if same
   if (selected && selected.kind === sel.kind && selected.col === sel.col) {
     selected = null; render(); return;
@@ -715,10 +715,10 @@ function tryPlace(target) {
     render();
     if (G.over) { endGame(); return; }
     // auto-hint if no moves left
-    if (!hasAnyMove(0)) setStatus("No moves left — press “End Turn (Draw)”.");
-    else setStatus("Keep going, or press “End Turn (Draw)”.");
+    if (!hasAnyMove(0)) setStatus("אין מהלכים — הקש „סיום תור (משיכה)”.");
+    else setStatus("המשך לשחק, או הקש „סיום תור (משיכה)”.");
   } else {
-    flash("That move isn't legal there.");
+    flash("המהלך הזה לא חוקי כאן.");
   }
 }
 
@@ -729,13 +729,13 @@ function endTurn() {
   history = [];
   G.current = 1;
   render();
-  setStatus("Computer is thinking…");
+  setStatus("המחשב חושב…");
   setTimeout(runAI, 550);
 }
 
 function undo() {
   if (G.over || aiBusy || G.current !== 0) return;
-  if (history.length === 0) { flash("Nothing to undo this turn."); return; }
+  if (history.length === 0) { flash("אין מה לבטל בתור זה."); return; }
   restore(history.pop());
   selected = null;
   render();
@@ -806,8 +806,8 @@ function runAI() {
         aiBusy = false;
         G.current = 0;
         render();
-        if (!hasAnyMove(0)) setStatus("Your turn — no moves? Press “End Turn (Draw)”.");
-        else setStatus("Your turn — tap a card, then a destination.");
+        if (!hasAnyMove(0)) setStatus("תורך — אין מהלכים? הקש „סיום תור (משיכה)”.");
+        else setStatus("תורך — הקש על קלף ואז על היעד.");
       }, 450);
     }
   }
@@ -876,8 +876,8 @@ function render() {
   const p2r = G.players[1].reserve.length;
   const b1 = document.getElementById("p1reserve");
   const b2 = document.getElementById("p2reserve");
-  b1.textContent = "Reserve: " + p1r;
-  b2.textContent = "Reserve: " + p2r;
+  b1.textContent = "רזרבה: " + p1r;
+  b2.textContent = "רזרבה: " + p2r;
   b1.classList.toggle("win", p1r === 0);
   b2.classList.toggle("win", p2r === 0);
 
@@ -889,9 +889,9 @@ function render() {
   const p2row = document.getElementById("p2row");
   p2row.innerHTML = "";
   const P2 = G.players[1];
-  p2row.appendChild(pileGroup("Reserve", topOf(P2.reserve), true, P2.reserve.length, null));
-  p2row.appendChild(pileGroup("Stock", topOf(P2.stock), false, P2.stock.length, null));
-  p2row.appendChild(pileGroup("Waste", topOf(P2.waste), true, P2.waste.length, null));
+  p2row.appendChild(pileGroup("רזרבה", topOf(P2.reserve), true, P2.reserve.length, null));
+  p2row.appendChild(pileGroup("חפיסה", topOf(P2.stock), false, P2.stock.length, null));
+  p2row.appendChild(pileGroup("פסולת", topOf(P2.waste), true, P2.waste.length, null));
 
   /* ----- Foundations ----- */
   const fEl = document.getElementById("foundations");
@@ -963,11 +963,11 @@ function render() {
   p1row.innerHTML = "";
   const P1 = G.players[0];
   const myTurn = G.current === 0 && !G.over && !aiBusy;
-  p1row.appendChild(pileGroup("Reserve", topOf(P1.reserve), true, P1.reserve.length,
+  p1row.appendChild(pileGroup("רזרבה", topOf(P1.reserve), true, P1.reserve.length,
     () => trySelect({ kind: "reserve" }),
     { selectable: myTurn && P1.reserve.length > 0, selected: selected && selected.kind === "reserve" }));
-  p1row.appendChild(pileGroup("Stock", topOf(P1.stock), false, P1.stock.length, null));
-  p1row.appendChild(pileGroup("Waste", topOf(P1.waste), true, P1.waste.length,
+  p1row.appendChild(pileGroup("חפיסה", topOf(P1.stock), false, P1.stock.length, null));
+  p1row.appendChild(pileGroup("פסולת", topOf(P1.waste), true, P1.waste.length,
     () => trySelect({ kind: "waste" }),
     { selectable: myTurn && P1.waste.length > 0, selected: selected && selected.kind === "waste" }));
 
@@ -1036,31 +1036,31 @@ function flash(t) {
 function endGame() {
   const youWon = G.winner === 0;
   showModal(
-    youWon ? "You Win! ♠♥♦♣" : "Computer Wins",
-    `<div class="big-result">${youWon ? "You emptied your Reserve first!" : "The computer emptied its Reserve first."}</div>
-     <p style="text-align:center">Final Reserve counts — You: <b>${G.players[0].reserve.length}</b> &nbsp;|&nbsp; Computer: <b>${G.players[1].reserve.length}</b></p>`,
-    [{ label: "New Game", primary: true, action: () => { hideModal(); newGame(); } }]
+    youWon ? "ניצחת! ♠♥♦♣" : "המחשב ניצח",
+    `<div class="big-result">${youWon ? "רוקנת את הרזרבה שלך ראשון!" : "המחשב רוקן את הרזרבה שלו ראשון."}</div>
+     <p style="text-align:center">רזרבה סופית — אתה: <b>${G.players[0].reserve.length}</b> &nbsp;|&nbsp; מחשב: <b>${G.players[1].reserve.length}</b></p>`,
+    [{ label: "משחק חדש", primary: true, action: () => { hideModal(); newGame(); } }]
   );
-  setStatus(youWon ? "You win!" : "Computer wins.");
+  setStatus(youWon ? "ניצחת!" : "המחשב ניצח.");
 }
 
 function showRules() {
-  showModal("How to Play — Touch (Russian Bank)",
-    `<p><b>Goal:</b> be the first to empty your 13-card <b>Reserve</b> pile.</p>
-     <h3>On your turn</h3>
+  showModal("איך משחקים — טאץ׳ (בנק רוסי)",
+    `<p><b>המטרה:</b> להיות הראשון לרוקן את ערימת ה<b>רזרבה</b> בת 13 הקלפים שלך.</p>
+     <h3>בתורך</h3>
      <ul>
-       <li>Tap one of your movable cards (<b>Reserve</b> top, <b>Waste</b> top, or any <b>Tableau</b> top). It highlights, and legal spots glow.</li>
-       <li>Tap a glowing <b>Foundation</b> or <b>Tableau</b> slot to move it.</li>
-       <li>Make as many moves as you like, then press <b>End Turn (Draw)</b> to draw from Stock to Waste — that ends your turn.</li>
+       <li>הקש על אחד הקלפים הזמינים שלך (הקלף העליון ב<b>רזרבה</b>, ב<b>פסולת</b>, או ראש כל עמודת <b>טבלה</b>). הוא יסומן, והמקומות החוקיים יאירו.</li>
+       <li>הקש על משבצת <b>בסיס</b> או <b>טבלה</b> מאירה כדי להזיז אליה את הקלף.</li>
+       <li>עשה כמה מהלכים שתרצה, ואז הקש <b>סיום תור (משיכה)</b> כדי למשוך קלף מה<b>חפיסה</b> ל<b>פסולת</b> — זה מסיים את תורך.</li>
      </ul>
-     <h3>Building rules</h3>
+     <h3>חוקי הבנייה</h3>
      <ul>
-       <li><b>Foundations</b> build <b>UP</b> by suit: A, 2, 3 … K (same suit).</li>
-       <li><b>Tableau</b> builds <b>DOWN</b> in alternating colours (e.g. red 10 on black J).</li>
-       <li>An <b>empty Tableau</b> slot must be filled from your <b>Reserve</b> first; only if your Reserve is empty may you fill it from Waste or Tableau.</li>
+       <li><b>בסיסים</b> נבנים <b>כלפי מעלה</b> לפי צורה, מהאס ועד המלך (אותה צורה).</li>
+       <li><b>טבלה</b> נבנית <b>כלפי מטה</b> בצבעים מתחלפים (למשל עשר אדום על נסיך שחור).</li>
+       <li>משבצת <b>טבלה ריקה</b> חייבת להתמלא קודם מה<b>רזרבה</b> שלך; רק אם הרזרבה ריקה מותר למלא אותה מהפסולת או מהטבלה.</li>
      </ul>
-     <p style="opacity:.8">Two decks (104 cards). You are the bottom player; the computer plays the top.</p>`,
-    [{ label: "Got it", primary: true, action: hideModal }]
+     <p style="opacity:.8">שתי חפיסות (104 קלפים). אתה השחקן התחתון; המחשב משחק למעלה.</p>`,
+    [{ label: "הבנתי", primary: true, action: hideModal }]
   );
 }
 
@@ -1122,7 +1122,7 @@ const Music = (() => {
   // even when the phone's ring/silent switch is set to silent.
   const SILENT_WAV = "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
   let ctx = null, tone = null, drumBus = null, started = false, timer = null, nextLoop = 0;
-  let noiseBuf = null, silentEl = null;
+  let noiseBuf = null, silentEl = null, announced = false;
   let enabled = true;
   try { enabled = localStorage.getItem("touch-music") !== "off"; } catch (e) {}
 
@@ -1246,17 +1246,26 @@ const Music = (() => {
     } catch (e) {}
   }
 
+  function announce() {
+    if (announced) return;
+    announced = true;
+    try { flash("♫ המוזיקה פועלת"); } catch (e) {} // "♫ המוזיקה פועלת"
+  }
+
   // Idempotent: safe to call on every gesture. Always (re)resumes the context.
   function start() {
     if (!enabled) return;
     if (!init()) return;
     unlockMedia();
-    if (ctx.state !== "running") ctx.resume().catch(() => {});
+    // iOS/Safari kickstart: play a 1-sample buffer inside the gesture.
+    try { const bs = ctx.createBufferSource(); bs.buffer = ctx.createBuffer(1, 1, 22050); bs.connect(ctx.destination); bs.start(0); } catch (e) {}
     if (!started) {
       nextLoop = ctx.currentTime + 0.12;
       timer = setInterval(tick, 200);
       started = true;
     }
+    if (ctx.state === "running") { announce(); tick(); }
+    else ctx.resume().then(() => { nextLoop = ctx.currentTime + 0.12; announce(); tick(); }).catch(() => {});
     tick();
     updateBtn();
   }
@@ -1280,7 +1289,7 @@ const Music = (() => {
   function updateBtn() {
     const b = document.getElementById("musicBtn");
     if (!b) return;
-    b.innerHTML = (enabled ? "♫" : "♪") + (enabled ? " Music" : " Muted");
+    b.innerHTML = (enabled ? "♫" : "♪") + (enabled ? " מוזיקה" : " מושתק"); // מוזיקה / מושתק
     b.style.opacity = enabled ? "1" : ".7";
   }
 

@@ -201,7 +201,7 @@ const DEVICES = [
   const m1 = await page.evaluate(() => document.getElementById("musicBtn").textContent.trim());
   await page.click("#musicBtn");
   const m2 = await page.evaluate(() => document.getElementById("musicBtn").textContent.trim());
-  check("music toggle button flips label", /Music/.test(m0) && /Muted/.test(m1) && /Music/.test(m2), { m0, m1, m2 });
+  check("music toggle button flips label", /מוזיקה/.test(m0) && /מושתק/.test(m1) && /מוזיקה/.test(m2), { m0, m1, m2 });
   await page.close();
 
   /* ===== 5. Responsive layout + deep tableau columns ===== */
