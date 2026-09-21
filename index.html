@@ -577,25 +577,31 @@ let G = null;               // main game state
 let selected = null;        // {kind:'reserve'|'waste'|'tableau', col?}
 let history = [];           // undo snapshots within current human turn
 let aiBusy = false;
+let pendingAIStart = false; // AI won the opening cut and should move first
 
 function newGame() {
   // Combine two decks, shuffle, split 52/52.
   const all = shuffle([...makeDeck(0), ...makeDeck(1)]);
-  const p1cards = all.slice(0, 52);
-  const p2cards = all.slice(52, 104);
+  const c0 = all.slice(0, 52);   // you
+  const c1 = all.slice(52, 104); // computer
 
-  function mkPlayer(cards) {
-    return {
-      reserve: cards.slice(0, 13),   // top = last element
-      stock: cards.slice(13),        // draw from end
-      waste: [],
-    };
-  }
+  // Each player: 13 to Reserve, then seed the tableau, rest to Stock.
+  const p0 = { reserve: c0.slice(0, 13), stock: [], waste: [] };
+  const p1 = { reserve: c1.slice(0, 13), stock: [], waste: [] };
+  const rest0 = c0.slice(13), rest1 = c1.slice(13);
+
+  const tableau = Array.from({ length: 8 }, () => []);
+  // Traditional opening: 4 cards from you + 4 from the computer seed the eight
+  // tableau columns (one card each) — your four columns and the computer's four.
+  for (let i = 0; i < 4; i++) tableau[i] = [rest0[i]];       // your side
+  for (let i = 0; i < 4; i++) tableau[i + 4] = [rest1[i]];   // computer's side
+  p0.stock = rest0.slice(4);
+  p1.stock = rest1.slice(4);
 
   G = {
-    players: [mkPlayer(p1cards), mkPlayer(p2cards)], // 0 = You (bottom), 1 = Computer (top)
+    players: [p0, p1], // 0 = You (bottom), 1 = Computer (top)
     foundations: Array.from({ length: 8 }, () => []),
-    tableau: Array.from({ length: 8 }, () => []),
+    tableau: tableau,
     current: 0,
     over: false,
     winner: null,
@@ -603,8 +609,30 @@ function newGame() {
   selected = null;
   history = [];
   aiBusy = false;
+  pendingAIStart = false;
+
+  // Whoever's opening card (top of Reserve) is higher goes first (Ace high).
+  const openVal = (c) => (c.rank === 1 ? 14 : c.rank);
+  const o0 = topOf(p0.reserve), o1 = topOf(p1.reserve);
+  const label = (c) => rankLabel(c.rank) + SUIT_CHAR[c.suit];
+  let starter;
+  if (openVal(o0) === openVal(o1)) starter = Math.random() < 0.5 ? 0 : 1;
+  else starter = openVal(o0) > openVal(o1) ? 0 : 1;
+  G.current = starter;
+
   render();
-  setStatus("תורך — הקש על קלף, ואז הקש לאן להניח אותו.");
+  const cut = `קלף פתיחה — אתה ${label(o0)} מול מחשב ${label(o1)}. `;
+  if (starter === 0) setStatus(cut + "אתה מתחיל!");
+  else { setStatus(cut + "המחשב מתחיל!"); pendingAIStart = true; }
+  maybeStartAI();
+}
+
+// Start the computer's opening turn once nothing (e.g. the rules dialog) blocks it.
+function maybeStartAI() {
+  if (!pendingAIStart) return;
+  if (document.getElementById("modal").classList.contains("show")) return;
+  pendingAIStart = false;
+  setTimeout(runAI, 700);
 }
 
 /* ---------------- Rule helpers ---------------- */
@@ -843,6 +871,7 @@ function pickAIMove(seen) {
 }
 
 function runAI() {
+  if (G.over || G.current !== 1) return; // only the computer, only on its turn
   aiBusy = true;
   const seen = new Set([snapshot()]);
   let steps = 0;
@@ -1157,7 +1186,10 @@ function showModal(title, bodyHtml, buttons) {
   });
   document.getElementById("modal").classList.add("show");
 }
-function hideModal() { document.getElementById("modal").classList.remove("show"); }
+function hideModal() {
+  document.getElementById("modal").classList.remove("show");
+  maybeStartAI(); // if the computer won the opening cut, let it move now
+}
 
 /* ============================================================
    Background music — an original, looping composition in
@@ -1466,9 +1498,10 @@ window.addEventListener("orientationchange", () => setTimeout(relayout, 150));
 if (window.visualViewport) window.visualViewport.addEventListener("resize", relayout);
 
 fitLayout();
-newGame();
-// Show the rules once at first load.
+// Show the rules first so that, if the computer wins the opening cut, its
+// first move waits until the dialog is dismissed (see maybeStartAI).
 showRules();
+newGame();
 
 // Debug / test hook (safe to keep; used by headless tests).
 window.__touch = {

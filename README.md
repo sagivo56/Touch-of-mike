@@ -22,6 +22,13 @@ xdg-open index.html      # Linux
 
 Be the **first player to empty your 13-card Reserve pile.**
 
+## The deal
+
+Each player gets 13 cards to their Reserve, then **four cards each seed the eight
+tableau columns** (your four columns and the computer's four), and the rest (35)
+form the Stock. Each player's opening card is the top of their Reserve — **whoever's
+is higher goes first** (Ace high).
+
 ## Components
 
 Two standard 52-card decks (104 cards total). The screen has three zones:

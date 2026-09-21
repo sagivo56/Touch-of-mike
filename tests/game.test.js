@@ -86,11 +86,19 @@ const DEVICES = [
   const rules = await page.evaluate(() => {
     const T = window.__touch, g = T.state, out = {};
     const ids = new Set();
-    [...g.players[0].reserve, ...g.players[0].stock, ...g.players[1].reserve, ...g.players[1].stock].forEach((c) => ids.add(c.id));
+    const allCards = [
+      ...g.players[0].reserve, ...g.players[0].stock, ...g.players[0].waste,
+      ...g.players[1].reserve, ...g.players[1].stock, ...g.players[1].waste,
+      ...g.tableau.flat(), ...g.foundations.flat(),
+    ];
+    allCards.forEach((c) => ids.add(c.id));
     out.deal = {
       p1: g.players[0].reserve.length + g.players[0].stock.length,
       p2: g.players[1].reserve.length + g.players[1].stock.length,
-      reserve: g.players[0].reserve.length, unique: ids.size,
+      reserve: g.players[0].reserve.length,
+      stock: g.players[0].stock.length,
+      tableauSeed: g.tableau.reduce((n, x) => n + x.length, 0),
+      unique: ids.size,
     };
     const A = { rank: 1, suit: "S", color: "black" }, two = { rank: 2, suit: "S", color: "black" }, twoH = { rank: 2, suit: "H", color: "red" };
     g.foundations[0] = [];
@@ -119,9 +127,9 @@ const DEVICES = [
     out.loadReserve = T.canLoad({ rank: 6, suit: "S", color: "black" }, 1, "reserve");
     return out;
   });
-  check("dealt 52 cards per player", rules.deal.p1 === 52 && rules.deal.p2 === 52, rules.deal);
-  check("13-card reserve", rules.deal.reserve === 13, rules.deal);
-  check("104 unique cards", rules.deal.unique === 104, rules.deal);
+  check("13 reserve + 35 stock per player", rules.deal.reserve === 13 && rules.deal.stock === 35, rules.deal);
+  check("tableau seeded with 8 cards (4 per player)", rules.deal.tableauSeed === 8, rules.deal);
+  check("104 unique cards across all piles", rules.deal.unique === 104, rules.deal);
   check("foundation: Ace on empty only", rules.fEmptyAce && !rules.fEmptyTwo);
   check("foundation: up by suit only", rules.fUpSuit && !rules.fWrongSuit);
   check("tableau: down alternating colour", rules.tAlt && !rules.tSameColour);
