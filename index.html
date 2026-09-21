@@ -725,6 +725,7 @@ function trySelect(sel) {
     selected = null; render(); return;
   }
   selected = sel;
+  SFX.pick();
   render();
 }
 
@@ -732,6 +733,7 @@ function tryPlace(target) {
   if (G.over || aiBusy || G.current !== 0 || !selected) return;
   const moved = doMove(selected, target, 0, true);
   if (moved) {
+    if (target.type === "foundation") SFX.placeFoundation(); else SFX.place();
     selected = null;
     render();
     if (G.over) { endGame(); return; }
@@ -739,6 +741,7 @@ function tryPlace(target) {
     if (!hasAnyMove(0)) setStatus("אין מהלכים — הקש „סיום תור (משיכה)”.");
     else setStatus("המשך לשחק, או הקש „סיום תור (משיכה)”.");
   } else {
+    SFX.invalid();
     flash("המהלך הזה לא חוקי כאן.");
   }
 }
@@ -746,6 +749,7 @@ function tryPlace(target) {
 function endTurn() {
   if (G.over || aiBusy || G.current !== 0) return;
   drawCard(0);
+  SFX.draw();
   selected = null;
   history = [];
   G.current = 1;
@@ -758,6 +762,7 @@ function undo() {
   if (G.over || aiBusy || G.current !== 0) return;
   if (history.length === 0) { flash("אין מה לבטל בתור זה."); return; }
   restore(history.pop());
+  SFX.pick();
   selected = null;
   render();
 }
@@ -811,17 +816,20 @@ function runAI() {
 
   function step() {
     if (G.over) { aiBusy = false; endGame(); return; }
-    const mv = (steps < 80) ? pickAIMove(seen) : null; // safety cap
+    const mv = (steps < 60) ? pickAIMove(seen) : null; // safety cap
     if (mv) {
       doMove(mv.sel, mv.target, 1, false);
+      // Only sound foundation placements so rapid reserve-dumps don't machine-gun.
+      if (mv.target.type === "foundation") SFX.placeFoundation();
       seen.add(mv.hash);
       steps++;
       render();
       if (G.over) { aiBusy = false; endGame(); return; }
-      setTimeout(step, 420);
+      setTimeout(step, 190);
     } else {
       // No more useful moves -> draw and end AI turn
       drawCard(1);
+      SFX.draw();
       render();
       setTimeout(() => {
         aiBusy = false;
@@ -829,10 +837,10 @@ function runAI() {
         render();
         if (!hasAnyMove(0)) setStatus("תורך — אין מהלכים? הקש „סיום תור (משיכה)”.");
         else setStatus("תורך — הקש על קלף ואז על היעד.");
-      }, 450);
+      }, 250);
     }
   }
-  setTimeout(step, 300);
+  setTimeout(step, 250);
 }
 
 /* ---------------- Rendering ---------------- */
@@ -1062,6 +1070,7 @@ function flash(t) {
 
 function endGame() {
   const youWon = G.winner === 0;
+  if (youWon) SFX.win(); else SFX.lose();
   showModal(
     youWon ? "ניצחת! ♠♥♦♣" : "המחשב ניצח",
     `<div class="big-result">${youWon ? "רוקנת את הרזרבה שלך ראשון!" : "המחשב רוקן את הרזרבה שלו ראשון."}</div>
@@ -1320,10 +1329,69 @@ const Music = (() => {
     b.style.opacity = enabled ? "1" : ".7";
   }
 
+  // Create (if needed) and return the shared AudioContext, so sound effects can
+  // reuse it. Resumes it as well. Must be called from within a user gesture.
+  function ensureCtx() {
+    if (!init()) return null;
+    if (ctx.state !== "running") ctx.resume().catch(() => {});
+    return ctx;
+  }
+
   return {
-    start, stop, toggle, updateBtn, isRunning,
+    start, stop, toggle, updateBtn, isRunning, ensureCtx,
     isEnabled: () => enabled,
     isStarted: () => started,
+  };
+})();
+
+/* ============================================================
+   Sound effects — short 8-bit blips for gameplay feedback, sharing the
+   same AudioContext as the music (so they work even when music is muted).
+   ============================================================ */
+const SFX = (() => {
+  function ac() {
+    const ctx = Music.ensureCtx();
+    return (ctx && ctx.state === "running") ? ctx : (ctx || null);
+  }
+  // Sequence of single-note blips (each `dur` seconds), optionally delayed.
+  function seq(freqs, dur, type, vol, gap) {
+    const ctx = ac(); if (!ctx) return;
+    const step = gap || dur;
+    freqs.forEach((f, i) => {
+      const t = ctx.currentTime + i * step;
+      const o = ctx.createOscillator(); o.type = type;
+      o.frequency.setValueAtTime(f, t);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(vol, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(ctx.destination);
+      o.start(t); o.stop(t + dur + 0.02);
+    });
+  }
+  function whoosh(dur, hz, vol) {
+    const ctx = ac(); if (!ctx) return;
+    const t = ctx.currentTime;
+    const n = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const s = ctx.createBufferSource(); s.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = hz; f.Q.value = 0.7;
+    const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f).connect(g).connect(ctx.destination); s.start(t); s.stop(t + dur + 0.02);
+  }
+  return {
+    pick() { seq([740], 0.05, "square", 0.10); },                     // select a card
+    place() { seq([523, 698], 0.055, "square", 0.13); },             // onto tableau (two-step up)
+    placeFoundation() { seq([659, 988], 0.07, "square", 0.15); },    // onto foundation (brighter)
+    invalid() { seq([180, 120], 0.09, "sawtooth", 0.12); },          // illegal (low buzz down)
+    draw() { whoosh(0.13, 1100, 0.14); },                            // draw / flip
+    win() {
+      seq([523, 659, 784, 1047, 1319], 0.14, "square", 0.16, 0.13);  // ascending fanfare
+      seq([784, 1047, 1319], 0.5, "square", 0.10, 0.06);             // sparkle tail
+    },
+    lose() { seq([440, 392, 330, 262], 0.24, "triangle", 0.15, 0.2); }, // descending "aww"
   };
 })();
 

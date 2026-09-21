@@ -68,6 +68,11 @@ files, no copyrighted recordings). Browsers block audio until you interact, so i
 starts on your first tap; toggle it any time with the **♫ Music** button in the
 title bar (your choice is remembered).
 
+**Sound effects** (also 8-bit, sharing the same audio engine) play on gameplay
+events: selecting a card, placing on the tableau, placing on a foundation
+(a brighter chime), an illegal move (a low buzz), drawing/ending a turn, and a
+victory fanfare / defeat jingle.
+
 ## Responsive design
 
 The board is sized fluidly to the live viewport, so it fits every phone from an
