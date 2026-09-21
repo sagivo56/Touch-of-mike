@@ -721,51 +721,62 @@ function undo() {
 }
 
 /* ---------------- AI (Player 2) ---------------- */
-/* Greedy, loop-safe: never does tableau->tableau (which could cycle).
-   Priority favours emptying its Reserve. */
+/* Greedy with per-turn state de-duplication: it may play any legal move
+   (including tableau->tableau to open a column), but it never revisits a
+   board state seen earlier in the same turn — which makes infinite loops
+   impossible while still letting it maneuver. Priority favours emptying
+   its own Reserve and clearing cards onto Foundations. */
 
-function bestAIMove() {
-  const player = 1;
+function scoredMoves(player) {
   const candidates = [];
+  const sources = [{ kind: "reserve" }, { kind: "waste" }];
+  for (let c = 0; c < 8; c++) sources.push({ kind: "tableau", col: c });
 
-  function consider(sel, score) {
+  for (const sel of sources) {
     const src = resolveSource(sel, player);
-    if (!src) return;
+    if (!src) continue;
     for (const t of validTargets(src, player)) {
-      // Skip tableau->tableau for loop safety, EXCEPT onto an empty column
-      // fed from reserve (that always helps).
-      if (sel.kind === "tableau" && t.type === "tableau") continue;
-      let s = score;
-      if (t.type === "foundation") s += 100;           // progress off the board
-      if (sel.kind === "reserve") s += 60;             // emptying reserve = goal
-      if (sel.kind === "waste") s += 5;
-      if (t.type === "tableau" && G.tableau[t.i].length === 0) s += 2;
+      let s = 0;
+      if (t.type === "foundation") s += 100;                 // off the board — best
+      if (sel.kind === "reserve") s += 60;                   // emptying reserve = goal
+      else if (sel.kind === "waste") s += 12;
+      else s += 6;                                           // tableau source
+      if (t.type === "tableau" && G.tableau[t.i].length === 0) s += 4; // use empty col
+      if (sel.kind === "tableau" && t.type === "tableau") s -= 3;      // mild discourage
       candidates.push({ sel, target: t, score: s });
     }
   }
-
-  consider({ kind: "reserve" }, 40);
-  consider({ kind: "waste" }, 10);
-  for (let c = 0; c < 8; c++) consider({ kind: "tableau", col: c }, 8);
-
-  if (candidates.length === 0) return null;
   candidates.sort((a, b) => b.score - a.score);
-  return candidates[0];
+  return candidates;
+}
+
+// Pick the best move that leads to a state not yet seen this turn.
+function pickAIMove(seen) {
+  for (const c of scoredMoves(1)) {
+    const snap = snapshot();
+    doMove(c.sel, c.target, 1, false);
+    const h = snapshot();
+    restore(snap);
+    if (!seen.has(h)) return { sel: c.sel, target: c.target, hash: h };
+  }
+  return null;
 }
 
 function runAI() {
   aiBusy = true;
+  const seen = new Set([snapshot()]);
   let steps = 0;
 
   function step() {
     if (G.over) { aiBusy = false; endGame(); return; }
-    const mv = (steps < 40) ? bestAIMove() : null; // safety cap
+    const mv = (steps < 80) ? pickAIMove(seen) : null; // safety cap
     if (mv) {
       doMove(mv.sel, mv.target, 1, false);
+      seen.add(mv.hash);
       steps++;
       render();
       if (G.over) { aiBusy = false; endGame(); return; }
-      setTimeout(step, 480);
+      setTimeout(step, 420);
     } else {
       // No more useful moves -> draw and end AI turn
       drawCard(1);
@@ -1021,6 +1032,7 @@ showRules();
 window.__touch = {
   get state() { return G; },
   canFoundation, canTableau, doMove, drawCard, hasAnyMove,
+  resolveSource, validTargets, snapshot, restore,
   newGame, hideModal, endTurn,
 };
 </script>
