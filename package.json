@@ -1,0 +1,22 @@
+{
+  "name": "touch-russian-bank",
+  "version": "1.0.0",
+  "description": "Touch — a mobile-friendly, 2-player Russian Bank solitaire card game in the classic Windows Solitaire style.",
+  "type": "commonjs",
+  "scripts": {
+    "start": "npx --yes serve .",
+    "test": "node tests/game.test.js"
+  },
+  "keywords": [
+    "solitaire",
+    "russian-bank",
+    "card-game",
+    "game",
+    "mobile",
+    "web-audio"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "playwright-core": "^1.48.0"
+  }
+}

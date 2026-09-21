@@ -54,8 +54,51 @@ Two standard 52-card decks (104 cards total). The screen has three zones:
   over to form a fresh Stock.
 - Emptying your Reserve wins the game.
 
+## Background music
+
+An original, looping piece in **D harmonic minor** — with the raised-7th /
+augmented-second colour characteristic of Russian romantic music — is synthesized
+live with the Web Audio API (no audio files, no copyrighted recordings). Browsers
+block audio until you interact, so it starts on your first tap; toggle it any time
+with the **♫ Music** button in the title bar (your choice is remembered).
+
+## Responsive design
+
+The board is sized fluidly to the live viewport, so it fits every phone from an
+iPhone SE to a Pro Max, Galaxy and Pixel devices, and landscape — with safe-area
+insets so the title bar clears the notch/Dynamic Island and the controls clear the
+home indicator and Safari's floating toolbar. Tableau columns that accumulate many
+cards compress their overlap and the center area scrolls, so a long column never
+overflows or hides the fixed player/foundation zones.
+
+## Project structure
+
+```
+.
+├── index.html          # the entire game (HTML + CSS + JS, no build step)
+├── package.json        # scripts + dev dependency for the tests
+├── tests/
+│   ├── game.test.js    # end-to-end suite (rules, win, AI, music, responsive)
+│   └── README.md       # how to run the tests
+├── LICENSE             # MIT
+└── README.md
+```
+
 ## Tech
 
 Plain HTML/CSS/JavaScript — no frameworks, no network calls. All game state and rule
 validation live in `index.html`. A tiny `window.__touch` debug hook is exposed for
 automated testing.
+
+## Testing
+
+```bash
+npm install
+npx playwright install chromium   # first time only
+npm test
+```
+
+See [`tests/README.md`](tests/README.md) for details. The suite drives the real game
+in a headless Chromium and checks the rules engine, win/undo/flip flows, the AI
+(including loop-safety over 40 full games), music toggling, and responsive layout
+across 7 device viewports — with zero console errors.

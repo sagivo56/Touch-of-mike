@@ -453,6 +453,7 @@
     <span class="ico">T</span>
     <span>Touch — Russian Bank Solitaire</span>
     <span class="spacer"></span>
+    <button id="musicBtn" title="Toggle background music" aria-label="Toggle music">&#9834; Music</button>
     <button id="rulesBtn">Rules</button>
     <button id="newBtn">New</button>
   </div>
@@ -1079,11 +1080,145 @@ function showModal(title, bodyHtml, buttons) {
 }
 function hideModal() { document.getElementById("modal").classList.remove("show"); }
 
+/* ============================================================
+   Background music — an original, looping composition in
+   D harmonic minor with the raised-7th / augmented-second color
+   characteristic of Russian romantic music. Synthesized live with
+   the Web Audio API (no audio files, no copyrighted recordings).
+   ============================================================ */
+const Music = (() => {
+  const BPM = 84;
+  const beat = 60 / BPM;                 // seconds per quarter note
+  // [midiNote, beats]  (0 = rest). D harmonic minor: D E F G A Bb C#.
+  const MELODY = [
+    [69,1],[69,1],[65,1],[69,1],         // Dm
+    [67,1],[70,1],[74,1],[70,1],         // Gm
+    [73,2],[69,2],                       // A (raised 7th C#)
+    [74,2],[69,1],[65,1],                // Dm
+    [65,1],[69,1],[74,1],[73,1],         // Dm -> leading tone
+    [74,2],[70,2],                       // Bb
+    [70,1],[67,1],[70,1],[74,1],         // Gm
+    [73,2],[69,2],                       // A  (aug-2nd Bb->C# color)
+  ];
+  const BASS = [
+    [38,4],[43,4],[45,4],[38,4],
+    [38,4],[46,4],[43,4],[45,4],
+  ];
+  const loopDur = 32 * beat;             // 8 bars of 4/4
+
+  let ctx = null, master = null, started = false, timer = null, nextLoop = 0;
+  let enabled = true;
+  try { enabled = localStorage.getItem("touch-music") !== "off"; } catch (e) {}
+
+  const freq = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  function voice(time, midi, dur, type, peak, dest) {
+    if (midi <= 0) return;
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.value = freq(midi);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.exponentialRampToValueAtTime(peak, time + 0.03);
+    g.gain.exponentialRampToValueAtTime(peak * 0.6, time + dur * 0.5);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + dur * 0.98);
+    o.connect(g).connect(dest);
+    o.start(time);
+    o.stop(time + dur);
+  }
+
+  function scheduleLoop(start) {
+    let t = start;
+    for (const [m, b] of MELODY) { voice(t, m, b * beat * 0.96, "triangle", 0.16, master); t += b * beat; }
+    t = start;
+    for (const [m, b] of BASS) {
+      voice(t, m, b * beat * 0.96, "sine", 0.22, master);       // root
+      voice(t, m + 7, b * beat * 0.96, "sine", 0.07, master);   // soft fifth
+      t += b * beat;
+    }
+  }
+
+  function tick() {
+    if (!ctx) return;
+    while (nextLoop < ctx.currentTime + 0.6) { scheduleLoop(nextLoop); nextLoop += loopDur; }
+  }
+
+  function init() {
+    if (ctx) return true;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = 0.32;
+      // gentle ambience: short feedback delay bus
+      const delay = ctx.createDelay();
+      delay.delayTime.value = 0.19;
+      const fb = ctx.createGain();
+      fb.gain.value = 0.22;
+      const wet = ctx.createGain();
+      wet.gain.value = 0.5;
+      master.connect(ctx.destination);
+      master.connect(delay); delay.connect(fb); fb.connect(delay); delay.connect(wet); wet.connect(ctx.destination);
+      return true;
+    } catch (e) { ctx = null; return false; }
+  }
+
+  function start() {
+    if (started || !enabled) return;
+    if (!init()) return;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    nextLoop = ctx.currentTime + 0.15;
+    tick();
+    timer = setInterval(tick, 200);
+    started = true;
+    updateBtn();
+  }
+
+  function stop() {
+    if (timer) { clearInterval(timer); timer = null; }
+    if (ctx) ctx.suspend().catch(() => {});
+    started = false;
+    updateBtn();
+  }
+
+  function toggle() {
+    enabled = !enabled;
+    try { localStorage.setItem("touch-music", enabled ? "on" : "off"); } catch (e) {}
+    if (enabled) start(); else stop();
+    updateBtn();
+  }
+
+  function updateBtn() {
+    const b = document.getElementById("musicBtn");
+    if (!b) return;
+    b.innerHTML = (enabled ? "♫" : "♪") + (enabled ? " Music" : " Muted");
+    b.style.opacity = enabled ? "1" : ".7";
+  }
+
+  return {
+    start, toggle, updateBtn,
+    isEnabled: () => enabled,
+    isStarted: () => started,
+  };
+})();
+
 /* ---------------- Boot ---------------- */
 document.getElementById("newBtn").addEventListener("click", newGame);
 document.getElementById("rulesBtn").addEventListener("click", showRules);
 document.getElementById("endBtn").addEventListener("click", endTurn);
 document.getElementById("undoBtn").addEventListener("click", undo);
+document.getElementById("musicBtn").addEventListener("click", Music.toggle);
+Music.updateBtn();
+
+// Browsers block audio until a user gesture — start on the first tap anywhere.
+function primeAudio() {
+  Music.start();
+  window.removeEventListener("pointerdown", primeAudio);
+  window.removeEventListener("keydown", primeAudio);
+}
+window.addEventListener("pointerdown", primeAudio);
+window.addEventListener("keydown", primeAudio);
 
 function relayout() { fitLayout(); if (G) render(); }
 window.addEventListener("resize", relayout);
