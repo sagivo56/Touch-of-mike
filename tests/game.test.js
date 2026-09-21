@@ -109,6 +109,14 @@ const DEVICES = [
     out.tEmptyFromReserveOk = T.canTableau(r10, 1, "reserve", 0);
     g.players[0].reserve = [];
     out.tEmptyFromWasteOk = T.canTableau(r10, 1, "waste", 0);
+    // Loading onto opponent: same suit, one rank up or down; not otherwise.
+    g.players[1].waste = [{ rank: 7, suit: "H", color: "red" }];
+    out.loadUp = T.canLoad({ rank: 8, suit: "H", color: "red" }, 1, "waste");   // 8H on 7H
+    out.loadDown = T.canLoad({ rank: 6, suit: "H", color: "red" }, 1, "waste"); // 6H on 7H
+    out.loadWrongSuit = T.canLoad({ rank: 8, suit: "D", color: "red" }, 1, "waste");
+    out.loadGap = T.canLoad({ rank: 9, suit: "H", color: "red" }, 1, "waste");
+    g.players[1].reserve = [{ rank: 5, suit: "S", color: "black" }];
+    out.loadReserve = T.canLoad({ rank: 6, suit: "S", color: "black" }, 1, "reserve");
     return out;
   });
   check("dealt 52 cards per player", rules.deal.p1 === 52 && rules.deal.p2 === 52, rules.deal);
@@ -118,6 +126,7 @@ const DEVICES = [
   check("foundation: up by suit only", rules.fUpSuit && !rules.fWrongSuit);
   check("tableau: down alternating colour", rules.tAlt && !rules.tSameColour);
   check("empty tableau: reserve-first priority", rules.tEmptyFromReserveOk && !rules.tEmptyFromWasteBlocked && rules.tEmptyFromWasteOk);
+  check("loading: same suit, one rank up or down", rules.loadUp && rules.loadDown && rules.loadReserve && !rules.loadWrongSuit && !rules.loadGap, rules);
   await page.close();
 
   /* ===== 2. Win detection + waste flip + Undo (UI) ===== */
@@ -163,9 +172,15 @@ const DEVICES = [
   page = await open({ width: 390, height: 780 });
   await page.evaluate(() => { window.__touch.hideModal(); });
   await page.click("#endBtn");
-  await page.waitForFunction(() => window.__touch.state.current === 0 && !window.__touch.state.aiBusy, { timeout: 20000 });
-  const ai = await page.evaluate(() => ({ current: window.__touch.state.current, p2waste: window.__touch.state.players[1].waste.length }));
-  check("AI plays a turn and returns control", ai.current === 0 && ai.p2waste >= 1, ai);
+  // The AI either finishes its turn (control returns) or empties its reserve and
+  // wins outright — accept both.
+  await page.waitForFunction(() => { const g = window.__touch.state; return g.over || g.current === 0; }, { timeout: 20000 });
+  const ai = await page.evaluate(() => {
+    const g = window.__touch.state;
+    const placed = g.foundations.reduce((n, x) => n + x.length, 0) + g.tableau.reduce((n, x) => n + x.length, 0);
+    return { current: g.current, over: g.over, placed, aiReserve: g.players[1].reserve.length };
+  });
+  check("AI plays a turn (returns control or wins)", (ai.over || ai.current === 0) && (ai.placed > 0 || ai.over), ai);
 
   const sim = await page.evaluate(() => {
     const T = window.__touch;

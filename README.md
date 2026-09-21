@@ -54,6 +54,10 @@ The whole interface is in **Hebrew, right-to-left**.
   another Tableau column.
 - Moving from Reserve → Tableau/Foundation, Waste → Tableau/Foundation,
   Tableau → Tableau/Foundation.
+- **Loading (הדבקה):** you may slip a card onto an **opponent's** Reserve or
+  Waste pile when it's the **same suit** and **one rank up or down** from that
+  pile's top card — forcing them to deal with it. When a selected card can be
+  loaded, the opponent's piles pulse red. (The computer can load onto you too.)
 - Drawing (Stock → Waste) ends your turn; when your Stock runs out, your Waste is turned
   over to form a fresh Stock.
 - Emptying your Reserve wins the game.

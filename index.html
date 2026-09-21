@@ -247,6 +247,18 @@
   }
   .slot.valid-target.foundation::after { color: rgba(255,225,77,.5); }
 
+  /* Loading target: an opponent Reserve/Waste pile you can slip a card onto. */
+  .pilecard.load-target {
+    border-radius: 6px;
+    box-shadow: 0 0 0 2px #ff5b5b, 0 0 10px 3px rgba(255,91,91,.75);
+    animation: loadPulse 1s ease-in-out infinite;
+    cursor: pointer;
+  }
+  @keyframes loadPulse {
+    0%, 100% { box-shadow: 0 0 0 2px #ff5b5b, 0 0 8px 2px rgba(255,91,91,.6); }
+    50%      { box-shadow: 0 0 0 2px #ff8a3d, 0 0 14px 5px rgba(255,138,61,.85); }
+  }
+
   /* ---------- Cards ---------- */
   .card {
     width: var(--card-w);
@@ -643,12 +655,27 @@ function resolveSource(sel, player) {
   return null;
 }
 
+// "Loading" (הדבקה): a card may be slipped onto an OPPONENT's Reserve or Waste
+// pile if it is the same suit and one rank away (up or down) from that pile's
+// top card — forcing the opponent to deal with it.
+function canLoad(card, oppPlayer, pile) {
+  if (!card) return false;
+  const p = G.players[oppPlayer][pile];
+  if (p.length === 0) return false;
+  const t = p[p.length - 1];
+  return card.suit === t.suit && Math.abs(card.rank - t.rank) === 1;
+}
+
 // List every legal destination for a given source (for highlighting + validation)
 function validTargets(src, player) {
   const targets = [];
   if (!src) return targets;
   for (let fi = 0; fi < 8; fi++) if (canFoundation(src.card, fi)) targets.push({ type: "foundation", i: fi });
   for (let ti = 0; ti < 8; ti++) if (canTableau(src.card, ti, src.kind, player)) targets.push({ type: "tableau", i: ti });
+  const opp = 1 - player;
+  for (const pile of ["reserve", "waste"]) {
+    if (canLoad(src.card, opp, pile)) targets.push({ type: "load", player: opp, pile: pile });
+  }
   return targets;
 }
 
@@ -682,16 +709,18 @@ function restore(snap) {
 function doMove(sel, target, player, recordUndo) {
   const src = resolveSource(sel, player);
   if (!src) return false;
-  const ok = target.type === "foundation"
-    ? canFoundation(src.card, target.i)
-    : canTableau(src.card, target.i, src.kind, player);
+  const ok = target.type === "foundation" ? canFoundation(src.card, target.i)
+    : target.type === "tableau" ? canTableau(src.card, target.i, src.kind, player)
+    : target.type === "load" ? canLoad(src.card, target.player, target.pile)
+    : false;
   if (!ok) return false;
 
   if (recordUndo) history.push(snapshot());
 
   const card = src.remove();
   if (target.type === "foundation") G.foundations[target.i].push(card);
-  else G.tableau[target.i].push(card);
+  else if (target.type === "tableau") G.tableau[target.i].push(card);
+  else G.players[target.player][target.pile].push(card); // load onto opponent
 
   // Win check: reserve emptied
   if (G.players[player].reserve.length === 0 && !G.over) {
@@ -733,7 +762,10 @@ function tryPlace(target) {
   if (G.over || aiBusy || G.current !== 0 || !selected) return;
   const moved = doMove(selected, target, 0, true);
   if (moved) {
-    if (target.type === "foundation") SFX.placeFoundation(); else SFX.place();
+    if (target.type === "foundation") SFX.placeFoundation();
+    else if (target.type === "load") SFX.load();
+    else SFX.place();
+    if (target.type === "load") flash("הדבקת קלף ליריב! 🎯");
     selected = null;
     render();
     if (G.over) { endGame(); return; }
@@ -785,6 +817,7 @@ function scoredMoves(player) {
     for (const t of validTargets(src, player)) {
       let s = 0;
       if (t.type === "foundation") s += 100;                 // off the board — best
+      if (t.type === "load") s += 28;                        // burden the opponent
       if (sel.kind === "reserve") s += 60;                   // emptying reserve = goal
       else if (sel.kind === "waste") s += 12;
       else s += 6;                                           // tableau source
@@ -819,8 +852,10 @@ function runAI() {
     const mv = (steps < 60) ? pickAIMove(seen) : null; // safety cap
     if (mv) {
       doMove(mv.sel, mv.target, 1, false);
-      // Only sound foundation placements so rapid reserve-dumps don't machine-gun.
+      // Sound the notable moves (foundation / loading onto you); skip rapid
+      // tableau dumps so they don't machine-gun.
       if (mv.target.type === "foundation") SFX.placeFoundation();
+      else if (mv.target.type === "load") { SFX.load(); flash("היריב הדביק לך קלף! 😈"); }
       seen.add(mv.hash);
       steps++;
       render();
@@ -869,7 +904,7 @@ function pileGroup(caption, card, faceUp, count, onTap, opts) {
   group.className = "pile-group";
 
   const holder = document.createElement("div");
-  holder.className = "pilecard";
+  holder.className = "pilecard" + (opts.target ? " load-target" : "");
   if (card) {
     const c = cardEl(card, faceUp);
     if (opts.selectable) c.classList.add("movable");
@@ -913,14 +948,17 @@ function render() {
   const src = selected ? resolveSource(selected, 0) : null;
   const targets = src ? validTargets(src, 0) : [];
   const isTarget = (type, i) => targets.some(t => t.type === type && t.i === i);
+  const isLoad = (pile) => targets.some(t => t.type === "load" && t.player === 1 && t.pile === pile);
 
-  /* ----- Player 2 (top) ----- */
+  /* ----- Player 2 (top): the human may LOAD onto its Reserve and Waste ----- */
   const p2row = document.getElementById("p2row");
   p2row.innerHTML = "";
   const P2 = G.players[1];
-  p2row.appendChild(pileGroup("רזרבה", topOf(P2.reserve), true, P2.reserve.length, null));
+  p2row.appendChild(pileGroup("רזרבה", topOf(P2.reserve), true, P2.reserve.length,
+    () => tryPlace({ type: "load", player: 1, pile: "reserve" }), { target: isLoad("reserve") }));
   p2row.appendChild(pileGroup("חפיסה", topOf(P2.stock), false, P2.stock.length, null));
-  p2row.appendChild(pileGroup("פסולת", topOf(P2.waste), true, P2.waste.length, null));
+  p2row.appendChild(pileGroup("פסולת", topOf(P2.waste), true, P2.waste.length,
+    () => tryPlace({ type: "load", player: 1, pile: "waste" }), { target: isLoad("waste") }));
 
   /* ----- Foundations (two middle columns: 0-3 left, 4-7 right) ----- */
   function renderFoundation(i) {
@@ -1094,6 +1132,11 @@ function showRules() {
        <li><b>בסיסים</b> נבנים <b>כלפי מעלה</b> לפי צורה, מהאס ועד המלך (אותה צורה).</li>
        <li><b>טבלה</b> נבנית <b>כלפי מטה</b> בצבעים מתחלפים (למשל עשר אדום על נסיך שחור).</li>
        <li>משבצת <b>טבלה ריקה</b> חייבת להתמלא קודם מה<b>רזרבה</b> שלך; רק אם הרזרבה ריקה מותר למלא אותה מהפסולת או מהטבלה.</li>
+     </ul>
+     <h3>הדבקה ליריב 🎯</h3>
+     <ul>
+       <li>אפשר להשחיל קלף ל<b>רזרבה</b> או ל<b>פסולת</b> של היריב אם הוא <b>מאותה צורה</b> ו<b>מספר עוקב</b> (אחד למעלה או למטה) מהקלף העליון שם — וכך היריב נאלץ להיפטר ממנו.</li>
+       <li>כשקלף שלך מתאים, ערימות היריב שלמעלה יהבהבו באדום. הקש עליהן כדי להדביק.</li>
      </ul>
      <p style="opacity:.8">שתי חפיסות (104 קלפים). אתה השחקן התחתון; המחשב משחק למעלה.</p>`,
     [{ label: "הבנתי", primary: true, action: hideModal }]
@@ -1385,6 +1428,7 @@ const SFX = (() => {
     pick() { seq([740], 0.05, "square", 0.10); },                     // select a card
     place() { seq([523, 698], 0.055, "square", 0.13); },             // onto tableau (two-step up)
     placeFoundation() { seq([659, 988], 0.07, "square", 0.15); },    // onto foundation (brighter)
+    load() { seq([392, 294, 220], 0.07, "square", 0.15, 0.05); },    // loading onto opponent (down)
     invalid() { seq([180, 120], 0.09, "sawtooth", 0.12); },          // illegal (low buzz down)
     draw() { whoosh(0.13, 1100, 0.14); },                            // draw / flip
     win() {
@@ -1429,7 +1473,7 @@ showRules();
 // Debug / test hook (safe to keep; used by headless tests).
 window.__touch = {
   get state() { return G; },
-  canFoundation, canTableau, doMove, drawCard, hasAnyMove,
+  canFoundation, canTableau, canLoad, doMove, drawCard, hasAnyMove,
   resolveSource, validTargets, snapshot, restore,
   columnOffset, fitLayout,
   newGame, hideModal, endTurn,
